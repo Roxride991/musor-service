@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  postgres-musor:
+    image: postgres:15
+    container_name: postgres-musor
+    environment:
+      POSTGRES_DB: musor_service
+      POSTGRES_USER: musor_user
+      POSTGRES_PASSWORD: musor123
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./../postgres_data:/var/lib/postgresql/data  # ← данные будут в корне проекта
+
+volumes: {}
