@@ -15,5 +15,6 @@ public class AuthResponse {
     private String phone;
     private String name;
     private UserRole role;
+    private String token;
     private String message; // Для ошибок
 }
