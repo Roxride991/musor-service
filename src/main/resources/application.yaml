@@ -9,7 +9,6 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
 
-# Настройки геокодера
 geocoder:
   yandex:
     api-key: "65373eca-d019-48a8-b08b-3ab099810d22"
@@ -32,3 +31,20 @@ spring:
     show-sql: true
   flyway:
     enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
