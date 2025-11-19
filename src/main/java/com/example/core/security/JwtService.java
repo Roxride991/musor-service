@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.util.Date;
 
-@Service // ← ЭТА АННОТАЦИЯ ОБЯЗАТЕЛЬНА!
+@Service
 public class JwtService {
 
     private final SecretKey key = Keys.hmacShaKeyFor("32-byte-secret-key-for-jwt-256-bit".getBytes());
