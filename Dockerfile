@@ -16,7 +16,7 @@ COPY src ./src
 RUN ./gradlew bootJar -x test
 
 # Stage 2: Запуск
-FROM eclipse-temurin:21-jre-alpine 
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 COPY --from=builder /app/build/libs/*.jar app.jar
