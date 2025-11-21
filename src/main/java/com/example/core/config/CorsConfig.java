@@ -22,17 +22,6 @@ public class CorsConfig {
                         .allowedHeaders("*")
                         .exposedHeaders("Authorization")
                         .allowCredentials(true)
-                        .maxAge(3600); // кэшировать preflight на 1 час
-
-                // Для всех остальных endpoints (на всякий случай)
-                registry.addMapping("/**")
-                        .allowedOriginPatterns(
-                                "http://localhost:5173",
-                                "https://musoren-front.vercel.app"
-                        )
-                        .allowedMethods("OPTIONS") // только OPTIONS для preflight
-                        .allowedHeaders("*")
-                        .allowCredentials(true)
                         .maxAge(3600);
             }
         };
