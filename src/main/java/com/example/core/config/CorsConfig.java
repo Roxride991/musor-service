@@ -3,7 +3,6 @@ package com.example.core.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -15,16 +14,27 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/api/**")
-                        .allowedOrigins(
-                                "http://localhost:5173",           // локальный фронтенд
-                                "https://musoren-front.vercel.app" // продакшен-фронтенд
+                        .allowedOriginPatterns(
+                                "http://localhost:5173",
+                                "https://musoren-front.vercel.app"
                         )
                         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
-                        .exposedHeaders("Authorization") // если используешь JWT
-                        .allowCredentials(true); // если нужен доступ к cookies
-            }
+                        .exposedHeaders("Authorization")
+                        .allowCredentials(true)
+                        .maxAge(3600); // кэшировать preflight на 1 час
 
+                // Для всех остальных endpoints (на всякий случай)
+                registry.addMapping("/**")
+                        .allowedOriginPatterns(
+                                "http://localhost:5173",
+                                "https://musoren-front.vercel.app"
+                        )
+                        .allowedMethods("OPTIONS") // только OPTIONS для preflight
+                        .allowedHeaders("*")
+                        .allowCredentials(true)
+                        .maxAge(3600);
+            }
         };
     }
 }
