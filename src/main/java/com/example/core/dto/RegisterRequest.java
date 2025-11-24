@@ -31,4 +31,6 @@ public class RegisterRequest {
 
     @NotNull(message = "Роль обязательна")
     private UserRole role;
+
+    @NotBlank private String code;
 }

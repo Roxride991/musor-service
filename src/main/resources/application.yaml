@@ -14,6 +14,9 @@ geocoder:
     api-key: "65373eca-d019-48a8-b08b-3ab099810d22"
     url: "https://geocode-maps.yandex.ru/1.x/"
     timeout: 5000
+sms:
+  ru:
+    api-id: ${SMS_RU_API_ID:}
 
 ---
 spring:
@@ -48,3 +51,7 @@ spring:
     show-sql: false
   flyway:
     enabled: true
+
+sms:
+  ru:
+    api-id: ${SMS_RU_API_ID:}

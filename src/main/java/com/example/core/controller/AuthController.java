@@ -1,8 +1,6 @@
 package com.example.core.controller;
 
-import com.example.core.dto.AuthResponse;
-import com.example.core.dto.LoginRequest;
-import com.example.core.dto.RegisterRequest;
+import com.example.core.dto.*;
 import com.example.core.model.User;
 import com.example.core.security.JwtService;
 import com.example.core.service.AuthService;
@@ -32,24 +30,34 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         try {
+            // 🔒 Проверяем OTP
+            if (!otpService.verifyOtp(request.getPhone(), request.getCode())) {
+                return ResponseEntity.badRequest().body(
+                        AuthResponse.builder()
+                                .message("Неверный или устаревший код подтверждения")
+                                .build()
+                );
+            }
+
             User user = authService.register(
                     request.getPhone(),
                     request.getName(),
                     request.getPassword(),
                     request.getRole()
             );
-            AuthResponse response = AuthResponse.builder()
-                    .id(user.getId())
-                    .phone(user.getPhone())
-                    .name(user.getName())
-                    .role(user.getUserRole())
-                    .build();
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(
+                    AuthResponse.builder()
+                            .id(user.getId())
+                            .phone(user.getPhone())
+                            .name(user.getName())
+                            .role(user.getUserRole())
+                            .build()
+            );
+
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(
-                    AuthResponse.builder()
-                            .message(e.getMessage())
-                            .build()
+                    AuthResponse.builder().message(e.getMessage()).build()
             );
         }
     }
@@ -77,17 +85,13 @@ public class AuthController {
     }
 
     @PostMapping("/send-code")
-    public ResponseEntity<Map<String, String>> sendCode(@RequestBody Map<String, String> payload) {
-        String phone = payload.get("phone");
-
-        if (phone == null || phone.trim().isEmpty()) {
-            return ResponseEntity.badRequest().build();
+    public ResponseEntity<SendCodeResponse> sendCode(@Valid @RequestBody SendCodeRequest request) {
+        try {
+            otpService.sendSmsWithCode(request.getPhone());
+            return ResponseEntity.ok(new SendCodeResponse("Код отправлен"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(new SendCodeResponse(e.getMessage()));
         }
-
-        // Генерируем код (в продакшене — отправляем SMS)
-        String code = otpService.generateAndStoreOtp(phone);
-
-        // Возвращаем для тестирования (в продакшене — просто OK)
-        return ResponseEntity.ok(Map.of("code", code, "message", "Код отправлен"));
     }
 }

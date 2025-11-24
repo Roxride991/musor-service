@@ -14,8 +14,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SendCodeResponse {
     private String message;
-    // В MVP возвращаем код для тестирования
-    // В продакшене код не должен возвращаться в ответе
-    private String code; // TODO: убрать в продакшене
+
 }
 
