@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -23,10 +22,19 @@ public class OrderService {
     private final PaymentService paymentService;
     private final SubscriptionRepository subscriptionRepository;
 
-
     @Transactional
     public Order createOrder(User client, String address, OffsetDateTime pickupTime,
                              String comment, Double lat, Double lng, Subscription subscription) {
+
+        // ДОБАВЛЕНА ПРОВЕРКА НА NULL
+        if (client == null) {
+            throw new IllegalStateException("Пользователь не может быть null");
+        }
+
+        if (client.getUserRole() == null) {
+            throw new IllegalStateException("Роль пользователя не установлена");
+        }
+
         if (client.getUserRole() != UserRole.CLIENT) {
             throw new IllegalStateException("Только клиенты могут создавать заказы");
         }
@@ -44,7 +52,6 @@ public class OrderService {
         }
 
         if (subscription != null) {
-            // Проверка: подписка активна и не исчерпана
             if (!subscription.hasAvailableOrders()) {
                 throw new IllegalArgumentException("Лимит вывозов по подписке исчерпан");
             }
@@ -53,7 +60,6 @@ public class OrderService {
             }
         }
 
-        // Создаём заказ
         Order order = Order.builder()
                 .client(client)
                 .address(address)
@@ -63,20 +69,16 @@ public class OrderService {
                 .status(OrderStatus.PUBLISHED)
                 .build();
 
-        // Сохраняем заказ
         Order saved = orderRepository.save(order);
 
-        // Если есть подписка — увеличиваем счётчик использованных вывозов
         if (subscription != null) {
             subscription.setUsedOrders(subscription.getUsedOrders() + 1);
             subscriptionRepository.save(subscription);
         }
 
-        // ✅ Возвращаем правильную переменную: saved (а не savedOrder)
         return saved;
     }
 
-    // ✅ Только координаты — без адреса и геокодера
     private boolean isAddressInServiceZone(Double lat, Double lng) {
         ServiceZone activeZone = zoneRepository.findFirstByActiveTrue()
                 .orElseThrow(() -> new IllegalArgumentException("Активная зона обслуживания не настроена. Обратитесь к администратору."));
@@ -88,8 +90,7 @@ public class OrderService {
         return geoUtils.isPointInPolygon(lat, lng, activeZone.getCoordinates());
     }
 
-    // --- Все остальные методы (без изменений) ---
-
+    // Остальные методы остаются без изменений
     public List<Order> getOrdersForClient(User client) {
         if (client.getUserRole() != UserRole.CLIENT) {
             throw new IllegalStateException("Только клиенты могут просматривать свои заказы");

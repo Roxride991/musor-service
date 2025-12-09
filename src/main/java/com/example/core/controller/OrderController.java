@@ -6,13 +6,13 @@ import com.example.core.service.OrderService;
 import com.example.core.service.GeocodingService;
 import com.example.core.dto.mapper.DtoMapper;
 import com.example.core.repository.SubscriptionRepository;
+import com.example.core.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,17 +24,20 @@ public class OrderController {
     private final DtoMapper dtoMapper;
     private final SubscriptionRepository subscriptionRepository;
     private final GeocodingService geocodingService;
+    private final UserRepository userRepository; // ДОБАВЛЕН
 
     public OrderController(
             OrderService orderService,
             DtoMapper dtoMapper,
             SubscriptionRepository subscriptionRepository,
-            GeocodingService geocodingService
+            GeocodingService geocodingService,
+            UserRepository userRepository // ДОБАВЛЕН
     ) {
         this.orderService = orderService;
         this.dtoMapper = dtoMapper;
         this.subscriptionRepository = subscriptionRepository;
         this.geocodingService = geocodingService;
+        this.userRepository = userRepository; // ДОБАВЛЕН
     }
 
     @PostMapping
@@ -42,7 +45,11 @@ public class OrderController {
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody CreateOrderRequest request) {
 
-        if (currentUser.getUserRole() != UserRole.CLIENT) {
+        // Загружаем свежего пользователя из БД для гарантии правильной роли
+        User freshUser = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+
+        if (freshUser.getUserRole() != UserRole.CLIENT) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
@@ -53,7 +60,7 @@ public class OrderController {
                 subscription = subscriptionRepository.findById(subId)
                         .orElseThrow(() -> new IllegalArgumentException("Подписка не найдена"));
 
-                if (!subscription.getUser().getId().equals(currentUser.getId())) {
+                if (!subscription.getUser().getId().equals(freshUser.getId())) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                 }
                 if (subscription.getStatus() != SubscriptionStatus.ACTIVE) {
@@ -61,7 +68,6 @@ public class OrderController {
                 }
             }
 
-            // ✅ ГЕОКОДИНГ ДО ТРАНЗАКЦИИ
             Double lat = request.getLat();
             Double lng = request.getLng();
 
@@ -71,9 +77,9 @@ public class OrderController {
                 lng = coord.getLng();
             }
 
-
+            // Используем freshUser вместо currentUser
             Order order = orderService.createOrder(
-                    currentUser,
+                    freshUser,
                     request.getAddress(),
                     request.getPickupTime(),
                     request.getComment(),
@@ -97,6 +103,7 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
     @GetMapping
     public ResponseEntity<List<OrderResponse>> getOrders(
             @AuthenticationPrincipal User currentUser) {
@@ -106,8 +113,6 @@ public class OrderController {
             if (currentUser.getUserRole() == UserRole.CLIENT) {
                 orders = orderService.getOrdersForClient(currentUser);
             } else if (currentUser.getUserRole() == UserRole.COURIER) {
-                // Для курьера возвращаем объединенный список (для обратной совместимости)
-                // Но рекомендуется использовать /available и /active
                 var available = orderService.getAvailableOrdersForCourier(currentUser);
                 var ownActive = orderService.getActiveOrdersForCourier(currentUser);
                 orders = java.util.stream.Stream.concat(available.stream(), ownActive.stream())
@@ -127,9 +132,6 @@ public class OrderController {
         }
     }
 
-    /**
-     * Получение свободных заказов для курьера (статус PUBLISHED, не назначены курьеру).
-     */
     @GetMapping("/available")
     public ResponseEntity<List<OrderResponse>> getAvailableOrders(
             @AuthenticationPrincipal User currentUser) {
@@ -141,7 +143,7 @@ public class OrderController {
         try {
             List<Order> orders = orderService.getAvailableOrdersForCourier(currentUser);
             List<OrderResponse> responses = orders.stream()
-                    .map(order -> dtoMapper.toOrderResponse(order, true)) // isAvailable = true
+                    .map(order -> dtoMapper.toOrderResponse(order, true))
                     .collect(Collectors.toList());
             return ResponseEntity.ok(responses);
         } catch (IllegalStateException e) {
@@ -149,9 +151,6 @@ public class OrderController {
         }
     }
 
-    /**
-     * Получение активных заказов курьера (ACCEPTED, ON_THE_WAY, PICKED_UP).
-     */
     @GetMapping("/active")
     public ResponseEntity<List<OrderResponse>> getActiveOrders(
             @AuthenticationPrincipal User currentUser) {
@@ -163,7 +162,7 @@ public class OrderController {
         try {
             List<Order> orders = orderService.getActiveOrdersForCourier(currentUser);
             List<OrderResponse> responses = orders.stream()
-                    .map(order -> dtoMapper.toOrderResponse(order, false)) // isAvailable = false
+                    .map(order -> dtoMapper.toOrderResponse(order, false))
                     .collect(Collectors.toList());
             return ResponseEntity.ok(responses);
         } catch (IllegalStateException e) {
@@ -171,9 +170,6 @@ public class OrderController {
         }
     }
 
-    /**
-     * Получение статистики заказов для курьера (количество свободных и активных заказов).
-     */
     @GetMapping("/stats")
     public ResponseEntity<OrderStatsResponse> getOrderStats(
             @AuthenticationPrincipal User currentUser) {
@@ -194,7 +190,6 @@ public class OrderController {
         }
     }
 
-    /** Получение деталей заказа по ID с учётом роли и доступа. */
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrderById(
             @AuthenticationPrincipal User currentUser,
@@ -208,13 +203,11 @@ public class OrderController {
                         .findFirst()
                         .orElse(null);
             } else if (currentUser.getUserRole() == UserRole.COURIER) {
-                // Доступны: свои заказы + свободные
                 order = orderService.getAvailableOrdersForCourier(currentUser).stream()
                         .filter(o -> o.getId().equals(id))
                         .findFirst()
                         .orElse(null);
                 if (order == null) {
-                    // Проверим, принадлежит ли заказ курьеру
                     order = orderService.getOrderByIdAndCourier(id, currentUser);
                 }
             } else { // ADMIN
@@ -232,7 +225,6 @@ public class OrderController {
         }
     }
 
-    /** Отмена заказа клиентом до взятия/выполнения. */
     @DeleteMapping("/{id}/cancel")
     public ResponseEntity<?> cancelOrder(
             @AuthenticationPrincipal User currentUser,
@@ -250,7 +242,6 @@ public class OrderController {
         }
     }
 
-    /** Принятие заказа курьером (только COURIER). */
     @PostMapping("/{id}/accept")
     public ResponseEntity<OrderResponse> acceptOrder(
             @AuthenticationPrincipal User currentUser,
@@ -269,7 +260,6 @@ public class OrderController {
         }
     }
 
-    /** Обновление статуса заказа курьером. */
     @PatchMapping("/{id}/status")
     public ResponseEntity<OrderResponse> updateOrderStatus(
             @AuthenticationPrincipal User currentUser,
@@ -289,7 +279,6 @@ public class OrderController {
         }
     }
 
-    /** Ручное обновление статуса администратором. */
     @PatchMapping("/admin/{id}/status")
     public ResponseEntity<OrderResponse> updateOrderStatusByAdmin(
             @AuthenticationPrincipal User currentUser,

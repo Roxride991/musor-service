@@ -3,6 +3,7 @@ package com.example.core.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OtpService {
@@ -86,18 +88,21 @@ public class OtpService {
 
             // Успешно — обновляем время последнего запроса
             lastRequestTime.put(phone, now);
-            System.out.println("✅ SMS отправлено на " + phone + ", ID: " + root.path("sms").path(phone).path("sms_id").asText());
+            log.info("SMS отправлено на {}, ID: {}", phone, root.path("sms").path(phone).path("sms_id").asText());
 
         } catch (RestClientException e) {
-            System.err.println("Сетевая ошибка при отправке SMS: " + e.getMessage());
+            log.error("Сетевая ошибка при отправке SMS на {}: {}", phone, e.getMessage(), e);
             throw new IllegalStateException("Не удалось подключиться к SMS-сервису", e);
         } catch (Exception e) {
-            System.err.println("Ошибка при отправке SMS: " + e.getMessage());
+            log.error("Ошибка при отправке SMS на {}: {}", phone, e.getMessage(), e);
             throw new IllegalStateException("Не удалось отправить SMS", e);
         }
     }
 
-    public boolean verifyOtp(String phone, String code) {
+    public boolean
+
+
+    verifyOtp(String phone, String code) {
         OtpData data = otpStorage.get(phone);
         if (data == null || data.expiresAt.isBefore(LocalDateTime.now())) {
             otpStorage.remove(phone);

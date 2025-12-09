@@ -56,14 +56,11 @@ public class Subscription {
     @Column(nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    // 🔹 Удобный метод: есть ли ещё доступные вывозы?
-    @Transient
+
     public boolean hasAvailableOrders() {
         return usedOrders < totalAllowedOrders && getStatus() == SubscriptionStatus.ACTIVE;
     }
 
-    // 🔹 Удобный метод: сколько осталось
-    @Transient
     public int getRemainingOrders() {
         return Math.max(0, totalAllowedOrders - usedOrders);
     }

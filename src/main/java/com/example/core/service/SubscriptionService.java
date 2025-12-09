@@ -119,12 +119,4 @@ public class SubscriptionService {
         subscription.setStatus(SubscriptionStatus.ACTIVE);
         return subscriptionRepository.save(subscription);
     }
-
-    /** Возвращает стоимость в зависимости от плана. */
-    private BigDecimal getPrice(SubscriptionPlan plan) {
-        return switch (plan) {
-            case WEEKLY -> new BigDecimal("900.00");
-            case MONTHLY -> new BigDecimal("2500.00");
-        };
-    }
 }
