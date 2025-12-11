@@ -12,11 +12,17 @@ spring:
 jwt:
   secret: ${JWT_SECRET:32-byte-secret-key-for-jwt-256-bit}
 
+# ДОБАВЬТЕ ЭТУ СЕКЦИЮ
+telegram:
+  bot:
+    token: 8571956535:AAG2RUettYzBAjYcAPZ7GhB5pGAVDxdW49Y;
+
 geocoder:
   yandex:
     api-key: "65373eca-d019-48a8-b08b-3ab099810d22"
     url: "https://geocode-maps.yandex.ru/1.x/"
     timeout: 5000
+
 sms:
   ru:
     api-id: ${SMS_RU_API_ID:}
@@ -33,15 +39,19 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
   flyway:
-    enabled: false
+    enabled: true
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+
+telegram:
+  bot:
+    token: 8571956535:AAG2RUettYzBAjYcAPZ7GhB5pGAVDxdW49Y
 
 ---
 spring:
@@ -55,7 +65,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
   flyway:
     enabled: true
@@ -64,6 +74,10 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN}
 
 sms:
   ru:

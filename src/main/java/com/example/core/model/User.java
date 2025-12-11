@@ -15,11 +15,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 
-/**
- * Пользователь доменной модели.
- * Содержит основную информацию о пользователе и его роли в системе.
- */
 @Getter
 @Setter
 @Builder
@@ -57,11 +54,45 @@ public class User implements UserDetails {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "telegram_id", unique = true)
+    private Long telegramId;
+
+    @Column(name = "telegram_username", length = 32)
+    private String telegramUsername;
+
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
+    @Column(name = "phone_verified", nullable = true)
+    @Builder.Default
+    private Boolean phoneVerified = false;
+
+    @Column(name = "phone_verification_method", length = 20)
+    private String phoneVerificationMethod;
+
+    @Column(name = "phone_verification_date")
+    private Date phoneVerificationDate;
+
+    @Column(name = "banned", nullable = true)
+    @Builder.Default
+    private Boolean banned = false;
+
+    @Column(name = "ban_reason", length = 500)
+    private String banReason;
+
+    @Column(name = "registration_ip", length = 45)
+    private String registrationIp;
+
+    @Column(name = "last_login")
+    private Date lastLogin;
+
+    @Column(name = "updated_at")
+    private Date updatedAt;
+
     // ========== UserDetails методы ==========
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Преобразуем UserRole в GrantedAuthority
         return Collections.singletonList(
                 new SimpleGrantedAuthority("ROLE_" + userRole.name())
         );
@@ -69,15 +100,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        // Spring Security использует телефон как username
         return this.phone;
-    }
-
-    // Для JWT нам также нужен email/phone в токене
-    public String getEmail() {
-        // Если у вас есть email поле, используйте его
-        // Или возвращаем phone, если email нет
-        return this.phone; // или this.email если есть такое поле
     }
 
     @Override
@@ -87,7 +110,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return !banned; // <-- ВАЖНО: возвращаем противоположное значение banned
     }
 
     @Override
@@ -97,15 +120,46 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return !banned; // <-- ВАЖНО: возвращаем противоположное значение banned
     }
 
-    // Дополнительные геттеры для удобства
+    // Дополнительные методы
+    public String getEmail() {
+        return this.phone;
+    }
+
     public String getPhoneNumber() {
         return phone;
     }
 
     public String getFullName() {
         return name;
+    }
+
+    // Метод для проверки banned (Lombok сгенерирует isBanned() автоматически)
+    // @Getter над классом уже генерирует public boolean isBanned()
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = OffsetDateTime.now();
+        if (updatedAt == null) {
+            updatedAt = new Date();
+        }
+        if (lastLogin == null) {
+            lastLogin = new Date();
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = new Date();
+    }
+
+    public boolean isBanned() {
+        return Boolean.TRUE.equals(this.banned);
+    }
+
+    public boolean isPhoneVerified() {
+        return Boolean.TRUE.equals(this.phoneVerified);
     }
 }

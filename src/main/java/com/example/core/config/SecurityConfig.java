@@ -4,6 +4,7 @@ import com.example.core.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -21,7 +22,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true) // Добавляем для @PreAuthorize
+@EnableMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -66,9 +67,13 @@ public class SecurityConfig {
 
                 // Настройка авторизации запросов
                 .authorizeHttpRequests(auth -> auth
+                        // OPTIONS запросы (preflight) всегда разрешены
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         // Публичные endpoints
                         .requestMatchers(
                                 "/api/auth/**",
+                                "/api/auth/telegram/**",
                                 "/api/zones/active",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",

@@ -1,0 +1,2 @@
+ALTER TABLE users ADD COLUMN banned BOOLEAN;
+ALTER TABLE users ADD COLUMN phone_verified BOOLEAN;
