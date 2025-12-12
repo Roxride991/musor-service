@@ -73,8 +73,11 @@ public class SecurityConfig {
                         // Публичные endpoints
                         .requestMatchers(
                                 "/api/auth/**",
+                                "/api/telegram/**",
                                 "/api/auth/telegram/**",
                                 "/api/zones/active",
+                                "/telegram-webapp.html",
+                                "/static/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"

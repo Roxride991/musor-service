@@ -70,19 +70,17 @@ public class TelegramBotService {
             String url = TELEGRAM_API_URL + botToken + "/sendMessage";
 
             // Создаем inline-клавиатуру с кнопкой
-            Map<String, Object> inlineKeyboard = new HashMap<>();
-            inlineKeyboard.put("text", "🔑 Войти на сайт");
-            inlineKeyboard.put("url", "https://t.me/" + username + "?start=login");
+            Map<String, Object> loginButton = new HashMap<>();
+            loginButton.put("text", "🔑 Войти на сайт");
+            loginButton.put("url", "https://t.me/" + username + "?start=login");
 
-            Map<String, Object> keyboardButton = new HashMap<>();
-            keyboardButton.put("inline_keyboard", new Object[][]{{inlineKeyboard}});
-
-            String replyMarkup = objectMapper.writeValueAsString(keyboardButton);
+            Map<String, Object> keyboard = new HashMap<>();
+            keyboard.put("inline_keyboard", new Object[][]{{loginButton}});
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("chat_id", chatId);
             requestBody.put("text", "Для входа на сайт Musoren нажмите кнопку ниже:");
-            requestBody.put("reply_markup", replyMarkup);
+            requestBody.put("reply_markup", keyboard);
             requestBody.put("parse_mode", "HTML");
 
             HttpHeaders headers = new HttpHeaders();
