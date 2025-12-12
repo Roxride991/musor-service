@@ -51,6 +51,7 @@ public class TelegramBotService {
         try {
             validateBotToken();
             String url = TELEGRAM_API_URL + botToken + "/sendMessage";
+            log.debug("✅ Полный URL Telegram API: {}", url);
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("chat_id", chatId);

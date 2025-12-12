@@ -112,6 +112,7 @@ public class TelegramWebhookController {
     private void handleCommand(Long chatId, String text, String firstName) {
         switch (text) {
             case "/start":
+                log.info("Handling command: '{}' for chatId={}", text, chatId);
                 telegramBotService.sendWelcomeMessage(chatId, firstName);
                 telegramBotService.sendLoginButton(chatId, botUsername);
                 break;
