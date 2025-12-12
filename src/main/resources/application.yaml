@@ -12,10 +12,12 @@ spring:
 jwt:
   secret: ${JWT_SECRET:32-byte-secret-key-for-jwt-256-bit}
 
-# ДОБАВЬТЕ ЭТУ СЕКЦИЮ
 telegram:
   bot:
-    token: 8571956535:AAG2RUettYzBAjYcAPZ7GhB5pGAVDxdW49Y;
+    token: ${TELEGRAM_BOT_TOKEN:8571956535:AAG2RUettYzBAjYcAPZ7GhB5pGAVDxdW49Y}
+    username: ${TELEGRAM_BOT_USERNAME:musoren_service_bot}
+    webapp-url: ${TELEGRAM_BOT_WEBAPP_URL:https://your-domain.com/telegram-webapp}
+    skip-validation: ${TELEGRAM_SKIP_VALIDATION:true}  # true для тестирования
 
 geocoder:
   yandex:

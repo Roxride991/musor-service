@@ -25,6 +25,9 @@ public class TelegramBotService {
     @Value("${telegram.bot.token}")
     private String botToken;
 
+    @Value("${telegram.bot.webapp-url:}")
+    private String webAppUrl;
+
     private static final String TELEGRAM_API_URL = "https://api.telegram.org/bot";
 
     public TelegramBotService(RestTemplate restTemplate, ObjectMapper objectMapper) {
@@ -33,10 +36,20 @@ public class TelegramBotService {
     }
 
     /**
+     * Проверяет, что токен бота валиден
+     */
+    private void validateBotToken() {
+        if (botToken == null || botToken.trim().isEmpty()) {
+            throw new IllegalStateException("Telegram bot token is not configured");
+        }
+    }
+
+    /**
      * Отправляет сообщение пользователю
      */
     public void sendMessage(Long chatId, String text) {
         try {
+            validateBotToken();
             String url = TELEGRAM_API_URL + botToken + "/sendMessage";
 
             Map<String, Object> requestBody = new HashMap<>();
@@ -52,27 +65,37 @@ public class TelegramBotService {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
-                log.debug("Message sent to chat {}: {}", chatId, text);
+                log.info("Message sent successfully to chat {}: {}", chatId, text);
             } else {
-                log.error("Failed to send message to chat {}: {}", chatId, response.getBody());
+                log.error("Failed to send message to chat {}: Status={}, Body={}",
+                        chatId, response.getStatusCode(), response.getBody());
             }
 
         } catch (Exception e) {
-            log.error("Error sending Telegram message", e);
+            log.error("Error sending Telegram message to chat {}: {}", chatId, e.getMessage(), e);
         }
     }
 
     /**
-     * Отправляет сообщение с кнопкой для авторизации
+     * Отправляет сообщение с кнопкой для авторизации через Web App
      */
     public void sendLoginButton(Long chatId, String username) {
         try {
+            validateBotToken();
             String url = TELEGRAM_API_URL + botToken + "/sendMessage";
 
-            // Создаем inline-клавиатуру с кнопкой
+            // Если webAppUrl не указан, используем относительный путь
+            String webAppUrlToUse = (webAppUrl != null && !webAppUrl.trim().isEmpty())
+                    ? webAppUrl
+                    : "https://t.me/" + username + "?start=webapp";
+
+            // Создаем inline-клавиатуру с кнопкой Web App
+            Map<String, Object> webApp = new HashMap<>();
+            webApp.put("url", webAppUrlToUse);
+
             Map<String, Object> loginButton = new HashMap<>();
             loginButton.put("text", "🔑 Войти на сайт");
-            loginButton.put("url", "https://t.me/" + username + "?start=login");
+            loginButton.put("web_app", webApp);
 
             Map<String, Object> keyboard = new HashMap<>();
             keyboard.put("inline_keyboard", new Object[][]{{loginButton}});
@@ -88,12 +111,17 @@ public class TelegramBotService {
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
 
-            restTemplate.postForEntity(url, request, String.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
-            log.info("Login button sent to chat {}", chatId);
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Login button sent successfully to chat {}", chatId);
+            } else {
+                log.error("Failed to send login button to chat {}: Status={}, Body={}",
+                        chatId, response.getStatusCode(), response.getBody());
+            }
 
         } catch (Exception e) {
-            log.error("Error sending login button", e);
+            log.error("Error sending login button to chat {}: {}", chatId, e.getMessage(), e);
         }
     }
 
@@ -214,7 +242,13 @@ public class TelegramBotService {
      */
     public void setBotMenu(String botUsername) {
         try {
+            validateBotToken();
             String url = TELEGRAM_API_URL + botToken + "/setChatMenuButton";
+
+            // Если webAppUrl не указан, используем относительный путь
+            String webAppUrlToUse = (webAppUrl != null && !webAppUrl.trim().isEmpty())
+                    ? webAppUrl
+                    : "https://t.me/" + botUsername + "?start=webapp";
 
             // Создаем меню-кнопку
             Map<String, Object> menuButton = new HashMap<>();
@@ -222,7 +256,7 @@ public class TelegramBotService {
             menuButton.put("text", "Войти на сайт");
 
             Map<String, Object> webApp = new HashMap<>();
-            webApp.put("url", "https://t.me/" + botUsername + "?start=webapp");
+            webApp.put("url", webAppUrlToUse);
             menuButton.put("web_app", webApp);
 
             Map<String, Object> requestBody = new HashMap<>();
@@ -238,7 +272,7 @@ public class TelegramBotService {
             if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("Bot menu button set successfully");
             } else {
-                log.error("Failed to set bot menu: {}", response.getBody());
+                log.error("Failed to set bot menu: {}",response.getBody());
             }
 
         } catch (Exception e) {
