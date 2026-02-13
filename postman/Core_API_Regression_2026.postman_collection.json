@@ -1,0 +1,3199 @@
+{
+  "info": {
+    "name": "Core API Regression 2026 (Current Config)",
+    "_postman_id": "a78f7e6c-13f1-4f2e-95aa-5c02133be95e",
+    "description": "Полноценный пакет Postman-тестов для текущей конфигурации Spring Boot backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('baseUrl')) {",
+          "  pm.environment.set('baseUrl', 'http://localhost:8082');",
+          "}",
+          "if (!pm.environment.get('runExternalTelegramOps')) {",
+          "  pm.environment.set('runExternalTelegramOps', 'false');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Bootstrap & Auth",
+      "item": [
+        {
+          "name": "Healthcheck: Telegram Auth Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/telegram/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "pm.test('available=true', function () { pm.expect(body.available).to.eql(true); });",
+                  "if (pm.response.code !== 200) {",
+                  "  console.log('[STOP] baseUrl=', pm.environment.get('baseUrl'));",
+                  "  console.log('[STOP] response=', pm.response.text());",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Login (signed, CLIENT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": {{telegramUserId}},\n  \"first_name\": \"{{telegramFirstName}}\",\n  \"last_name\": \"{{telegramLastName}}\",\n  \"username\": \"{{telegramUsername}}\",\n  \"photo_url\": \"\",\n  \"auth_date\": {{telegramAuthDate}},\n  \"hash\": \"{{telegramHash}}\",\n  \"phone_number\": \"{{telegramPhone}}\",\n  \"init_data\": \"{{telegramInitData}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/telegram/login"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const botToken = pm.environment.get('telegramBotToken') || '';",
+                  "let telegramUserId = pm.environment.get('telegramUserId');",
+                  "if (!telegramUserId) {",
+                  "  telegramUserId = String(900000000 + Math.floor(Math.random() * 99999999));",
+                  "  pm.environment.set('telegramUserId', telegramUserId);",
+                  "}",
+                  "const firstName = pm.environment.get('telegramFirstName') || 'Postman';",
+                  "const lastName = pm.environment.get('telegramLastName') || 'Tester';",
+                  "const username = pm.environment.get('telegramUsername') || 'postman_tester';",
+                  "let telegramPhone = pm.environment.get('telegramPhone');",
+                  "if (!telegramPhone || !/^\\+7\\d{10}$/.test(telegramPhone)) {",
+                  "  const random10 = Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');",
+                  "  telegramPhone = '+7' + random10;",
+                  "  pm.environment.set('telegramPhone', telegramPhone);",
+                  "}",
+                  "const authDate = String(Math.floor(Date.now() / 1000));",
+                  "const userObj = {",
+                  "  id: Number(telegramUserId),",
+                  "  first_name: firstName,",
+                  "  last_name: lastName,",
+                  "  username: username",
+                  "};",
+                  "const userJson = JSON.stringify(userObj);",
+                  "const dataMap = { auth_date: authDate, user: userJson };",
+                  "const dataCheckString = Object.keys(dataMap)",
+                  "  .sort()",
+                  "  .map((k) => `${k}=${dataMap[k]}`)",
+                  "  .join('\\n');",
+                  "const secretKey = CryptoJS.HmacSHA256('WebAppData', botToken);",
+                  "const hash = CryptoJS.HmacSHA256(dataCheckString, secretKey).toString(CryptoJS.enc.Hex);",
+                  "const initDataMap = { ...dataMap, hash };",
+                  "const initData = Object.keys(initDataMap)",
+                  "  .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(initDataMap[k])}`)",
+                  "  .join('&');",
+                  "pm.environment.set('telegramAuthDate', authDate);",
+                  "pm.environment.set('telegramHash', hash);",
+                  "pm.environment.set('telegramInitData', initData);",
+                  "pm.environment.unset('clientToken');",
+                  "pm.environment.unset('clientId');",
+                  "pm.environment.unset('clientRole');",
+                  "pm.environment.unset('subscriptionId');",
+                  "pm.environment.unset('orderId');",
+                  "pm.environment.unset('acceptedOrderId');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "pm.test('success=true', function () { pm.expect(body.success).to.eql(true); });",
+                  "pm.test('token exists', function () { pm.expect(body.data.token).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('clientToken', body.data.token);",
+                  "pm.environment.set('clientId', String(body.data.user.id));",
+                  "pm.environment.set('clientRole', String(body.data.user.role));",
+                  "pm.environment.set('clientPhone', String(body.data.user.phone));",
+                  "pm.environment.set('clientName', String(body.data.user.name));",
+                  "if (pm.response.code !== 200) {",
+                  "  console.log('Telegram signature failed. Проверь переменную telegramBotToken (должна совпадать с TELEGRAM_BOT_TOKEN backend).');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Auth Mirror Endpoint (/api/telegram/auth/telegram)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": {{telegramUserId}},\n  \"first_name\": \"{{telegramFirstName}}\",\n  \"last_name\": \"{{telegramLastName}}\",\n  \"username\": \"{{telegramUsername}}\",\n  \"photo_url\": \"\",\n  \"auth_date\": {{telegramAuthDate}},\n  \"hash\": \"{{telegramHash}}\",\n  \"phone_number\": \"{{telegramPhone}}\",\n  \"init_data\": \"{{telegramInitData}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/telegram/auth/telegram"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "pm.test('token exists', function () { pm.expect(body.token).to.be.a('string').and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional: Admin Login (phone/password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{adminPhone}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const phone = pm.environment.get('adminPhone');",
+                  "const pass = pm.environment.get('adminPassword');",
+                  "if (!phone || !pass) {",
+                  "  console.log('SKIP admin login: set adminPhone/adminPassword in environment');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Admin token exists', function () { pm.expect(body.token).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('adminToken', body.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional: Courier Login (phone/password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{courierPhone}}\",\n  \"password\": \"{{courierPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const phone = pm.environment.get('courierPhone');",
+                  "const pass = pm.environment.get('courierPassword');",
+                  "if (!phone || !pass) {",
+                  "  console.log('SKIP courier login: set courierPhone/courierPassword in environment');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Courier token exists', function () { pm.expect(body.token).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('courierToken', body.token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Public & Security",
+      "item": [
+        {
+          "name": "Public: Get Active Zone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/zones/active"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Zone has id/name/coordinates', function () {",
+                  "    pm.expect(body.id).to.exist;",
+                  "    pm.expect(body.name).to.be.a('string');",
+                  "    pm.expect(body.coordinates).to.be.an('array');",
+                  "  });",
+                  "  pm.environment.set('zoneId', String(body.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Public: Telegram Webhook Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 1001,\n  \"message\": {\n    \"message_id\": 10,\n    \"chat\": {\n      \"id\": 123456789,\n      \"first_name\": \"Postman\",\n      \"type\": \"private\"\n    },\n    \"date\": 1700000000,\n    \"text\": \"/start\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/telegram/webhook"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Security: /api/users/me without token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401 or 403', function () { pm.expect([401, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Security: Client cannot set active zone",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{clientToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Client Forbidden Zone\",\n  \"coordinates\": [\n    { \"lat\": 55.751244, \"lng\": 37.618423 },\n    { \"lat\": 55.761244, \"lng\": 37.618423 },\n    { \"lat\": 55.761244, \"lng\": 37.628423 },\n    { \"lat\": 55.751244, \"lng\": 37.628423 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/zones"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 403', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Security: Client cannot access /api/telegram/webhook-info",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{clientToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/telegram/webhook-info"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 403', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 User Profile (client)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{clientToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Get my profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('User payload contains id/phone/name/role', function () {",
+                  "  pm.expect(body.id).to.exist;",
+                  "  pm.expect(body.phone).to.match(/^\\+7\\d{10}$/);",
+                  "  pm.expect(body.name).to.be.a('string');",
+                  "  pm.expect(body.role).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update my name",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{updatedName}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/users/me/name"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';",
+                  "const suffix = Array.from({ length: 4 }, () => letters[Math.floor(Math.random() * letters.length)]).join('');",
+                  "pm.environment.set('updatedName', `Postman ${suffix}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Name changed', function () { pm.expect(body.name).to.eql(pm.environment.get('updatedName')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get my profile (after update)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "if (pm.environment.get('updatedName')) {",
+                  "  pm.test('Updated name persisted', function () {",
+                  "    pm.expect(body.name).to.eql(pm.environment.get('updatedName'));",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Service Zones (admin optional)",
+      "item": [
+        {
+          "name": "Optional: Set active zone as ADMIN",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Moscow Center Zone\",\n  \"coordinates\": [\n    { \"lat\": 55.7358, \"lng\": 37.5976 },\n    { \"lat\": 55.7758, \"lng\": 37.5976 },\n    { \"lat\": 55.7758, \"lng\": 37.6376 },\n    { \"lat\": 55.7358, \"lng\": 37.6376 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/zones"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminToken')) {",
+                  "  console.log('SKIP admin zone setup: adminToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Zone active=true', function () { pm.expect(body.active).to.eql(true); });",
+                  "pm.environment.set('zoneId', String(body.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Public: Get active zone (after setup)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/zones/active"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('zoneId', String(body.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Subscriptions (client)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{clientToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Get all subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Array response', function () { pm.expect(body).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create WEEKLY subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"WEEKLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/subscriptions"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "pm.environment.unset('pauseSucceeded');",
+                  "pm.environment.unset('resumeSucceeded');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 403', function () { pm.expect([201, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('subscriptionId', String(body.id));",
+                  "  pm.test('Plan is WEEKLY', function () { pm.expect(body.plan).to.eql('WEEKLY'); });",
+                  "}",
+                  "if (pm.response.code === 403) {",
+                  "  console.log('Subscription not created (possibly already active).');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get active subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/active"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Array response', function () { pm.expect(body).to.be.an('array'); });",
+                  "if (!pm.environment.get('subscriptionId') && body.length > 0) {",
+                  "  pm.environment.set('subscriptionId', String(body[0].id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pause subscription",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/{{subscriptionId}}/pause"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('subscriptionId')) {",
+                  "  console.log('SKIP: no subscriptionId');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Status changed to PAUSED', function () { pm.expect(body.status).to.eql('PAUSED'); });",
+                  "pm.environment.set('pauseSucceeded', 'true');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resume subscription",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/{{subscriptionId}}/resume"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('subscriptionId')) {",
+                  "  console.log('SKIP: no subscriptionId');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (pm.environment.get('pauseSucceeded') !== 'true') {",
+                  "  console.log('SKIP: pause step was not successful');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Status changed to ACTIVE', function () { pm.expect(body.status).to.eql('ACTIVE'); });",
+                  "pm.environment.set('resumeSucceeded', 'true');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel subscription",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/{{subscriptionId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('subscriptionId')) {",
+                  "  console.log('SKIP: no subscriptionId');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204, 400 or 403', function () { pm.expect([204, 400, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 204) {",
+                  "  pm.environment.unset('subscriptionId');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Orders (client + security checks)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{clientToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Create order (client)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Москва, Тверская улица, 1\",\n  \"pickupTime\": \"{{pickupTimeIso}}\",\n  \"comment\": \"Postman automated order\",\n  \"lat\": 55.7558,\n  \"lng\": 37.6176\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "const pickup = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();",
+                  "pm.environment.set('pickupTimeIso', pickup);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 400', function () { pm.expect([201, 400]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('orderId', String(body.id));",
+                  "  pm.test('Order created with PUBLISHED status', function () { pm.expect(body.status).to.eql('PUBLISHED'); });",
+                  "} else {",
+                  "  pm.environment.unset('orderId');",
+                  "  if (body && body.message) {",
+                  "    console.log('Order create rejected:', body.message);",
+                  "  } else {",
+                  "    console.log('Order create rejected with status 400');",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get my orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Array response', function () { pm.expect(body).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get order by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{orderId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('orderId')) {",
+                  "  console.log('SKIP: orderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Order id matches', function () { pm.expect(String(body.id)).to.eql(pm.environment.get('orderId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel order by client",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{orderId}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('orderId')) {",
+                  "  console.log('SKIP: orderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 or 400', function () { pm.expect([204, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Security: Client cannot view available courier orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/available"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 403', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Security: Client cannot view courier stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/stats"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 403', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Security: Client cannot accept order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/1/accept"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('clientToken')) {",
+                  "  console.log('SKIP: clientToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 403', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Courier Flow (optional)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{courierToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Optional: Courier get available orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/available"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('courierToken')) {",
+                  "  console.log('SKIP courier flow: courierToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 403', function () { pm.expect([200, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional: Courier accept order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{orderId}}/accept"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('courierToken')) {",
+                  "  console.log('SKIP courier flow: courierToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('orderId')) {",
+                  "  console.log('SKIP courier accept: orderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('acceptedOrderId', String(body.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional: Courier set ON_THE_WAY",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ON_THE_WAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders/{{acceptedOrderId}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('courierToken')) {",
+                  "  console.log('SKIP courier flow: courierToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('acceptedOrderId')) {",
+                  "  console.log('SKIP status update: acceptedOrderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional: Courier set PICKED_UP",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PICKED_UP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders/{{acceptedOrderId}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('courierToken')) {",
+                  "  console.log('SKIP courier flow: courierToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('acceptedOrderId')) {",
+                  "  console.log('SKIP status update: acceptedOrderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional: Courier set COMPLETED",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders/{{acceptedOrderId}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('courierToken')) {",
+                  "  console.log('SKIP courier flow: courierToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('acceptedOrderId')) {",
+                  "  console.log('SKIP status update: acceptedOrderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Admin Operations (optional)",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{adminToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Optional: Admin update order status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED_BY_COURIER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders/admin/{{orderId}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminToken')) {",
+                  "  console.log('SKIP admin flow: adminToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('orderId')) {",
+                  "  console.log('SKIP admin order update: orderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional External: Telegram webhook info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/telegram/webhook-info"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminToken')) {",
+                  "  console.log('SKIP telegram ops: adminToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (String(pm.environment.get('runExternalTelegramOps')).toLowerCase() !== 'true') {",
+                  "  console.log('SKIP telegram ops: set runExternalTelegramOps=true to enable');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 400', function () { pm.expect([200, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional External: Set Telegram webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/telegram/set-webhook?webhookUrl={{testWebhookUrl}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminToken')) {",
+                  "  console.log('SKIP telegram ops: adminToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (String(pm.environment.get('runExternalTelegramOps')).toLowerCase() !== 'true') {",
+                  "  console.log('SKIP telegram ops: set runExternalTelegramOps=true to enable');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 400', function () { pm.expect([200, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional External: Delete Telegram webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/telegram/delete-webhook"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminToken')) {",
+                  "  console.log('SKIP telegram ops: adminToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (String(pm.environment.get('runExternalTelegramOps')).toLowerCase() !== 'true') {",
+                  "  console.log('SKIP telegram ops: set runExternalTelegramOps=true to enable');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 400', function () { pm.expect([200, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Optional External: Telegram bot test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/telegram/test"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminToken')) {",
+                  "  console.log('SKIP telegram ops: adminToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (String(pm.environment.get('runExternalTelegramOps')).toLowerCase() !== 'true') {",
+                  "  console.log('SKIP telegram ops: set runExternalTelegramOps=true to enable');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 400', function () { pm.expect([200, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 Auth Validation & Negative",
+      "item": [
+        {
+          "name": "Validation: send-code invalid phone",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/send-code"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: register with fake OTP code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+79990000001\",\n  \"name\": \"Postman User\",\n  \"password\": \"Password123\",\n  \"role\": \"CLIENT\",\n  \"code\": \"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 400', function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Error message exists', function () { pm.expect(body.message).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative: login unknown user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+79990009999\",\n  \"password\": \"WrongPass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 Full E2E Cycle",
+      "description": "Полный цикл: phone OTP registration + Telegram WebApp login + order lifecycle",
+      "item": [
+        {
+          "name": "E2E Prep: Check active zone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/zones/active"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 404) {",
+                  "  console.log('No active zone. Для полного цикла заказов нужен active zone. Либо задай adminPhone/adminPassword для авто-настройки ниже, либо создай зону вручную.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Admin login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{adminPhone}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminPhone') || !pm.environment.get('adminPassword')) {",
+                  "  console.log('SKIP admin login: set adminPhone/adminPassword in environment');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('adminToken', body.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Set active zone as admin",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"E2E Moscow Zone\",\n  \"coordinates\": [\n    { \"lat\": 55.7358, \"lng\": 37.5976 },\n    { \"lat\": 55.7758, \"lng\": 37.5976 },\n    { \"lat\": 55.7758, \"lng\": 37.6376 },\n    { \"lat\": 55.7358, \"lng\": 37.6376 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/zones"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('adminToken')) {",
+                  "  console.log('SKIP set zone: adminToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phoneRegPhone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/send-code"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const phone = pm.environment.get('phoneRegPhone');",
+                  "if (!phone || !/^\\+7\\d{10}$/.test(phone)) {",
+                  "  console.log('SKIP phone flow: set phoneRegPhone in +7XXXXXXXXXX format');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('phoneRegName')) pm.environment.set('phoneRegName', 'Phone E2E User');",
+                  "if (!pm.environment.get('phoneRegPassword')) pm.environment.set('phoneRegPassword', 'Password123');",
+                  "pm.environment.unset('phoneFlowToken');",
+                  "pm.environment.unset('phoneFlowSubscriptionId');",
+                  "pm.environment.unset('phoneFlowOrderId');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 429', function () { pm.expect([200, 429]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 429) {",
+                  "  console.log('OTP cooldown active. Wait and retry if needed.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Register CLIENT with OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phoneRegPhone}}\",\n  \"name\": \"{{phoneRegName}}\",\n  \"password\": \"{{phoneRegPassword}}\",\n  \"role\": \"CLIENT\",\n  \"code\": \"{{phoneRegOtpCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneRegPhone')) {",
+                  "  console.log('SKIP phone register: phoneRegPhone is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('phoneRegOtpCode')) {",
+                  "  console.log('SKIP phone register: set phoneRegOtpCode from SMS');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 400', function () { pm.expect([201, 400]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 400) {",
+                  "  const body = pm.response.json();",
+                  "  console.log('Register returned 400:', body.message || body.error || pm.response.text());",
+                  "  console.log('Если пользователь уже существует, это ожидаемо. В этом случае следующий шаг login продолжит цикл.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phoneRegPhone}}\",\n  \"password\": \"{{phoneRegPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneRegPhone') || !pm.environment.get('phoneRegPassword')) {",
+                  "  console.log('SKIP phone login: set phoneRegPhone/phoneRegPassword');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('phoneFlowToken', body.token);",
+                  "pm.environment.set('phoneFlowUserId', String(body.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Get profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneFlowToken')) {",
+                  "  console.log('SKIP phone profile: phoneFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Create subscription",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"WEEKLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/subscriptions"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneFlowToken')) {",
+                  "  console.log('SKIP phone subscription: phoneFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 403', function () { pm.expect([201, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('phoneFlowSubscriptionId', String(body.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Get active subscriptions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/active"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneFlowToken')) {",
+                  "  console.log('SKIP phone active subscriptions: phoneFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "if (!pm.environment.get('phoneFlowSubscriptionId') && body.length > 0) {",
+                  "  pm.environment.set('phoneFlowSubscriptionId', String(body[0].id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Create order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{phoneFlowOrderPayload}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneFlowToken')) {",
+                  "  console.log('SKIP phone create order: phoneFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "const pickup = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();",
+                  "const payload = {",
+                  "  address: 'Москва, Тверская улица, 1',",
+                  "  pickupTime: pickup,",
+                  "  comment: 'Phone flow order',",
+                  "  lat: 55.7558,",
+                  "  lng: 37.6176",
+                  "};",
+                  "const subId = pm.environment.get('phoneFlowSubscriptionId');",
+                  "if (subId) payload.subscriptionId = Number(subId);",
+                  "pm.environment.set('phoneFlowOrderPayload', JSON.stringify(payload, null, 2));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 400', function () { pm.expect([201, 400]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('phoneFlowOrderId', String(body.id));",
+                  "} else {",
+                  "  console.log('Phone create order failed:', body.message || pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Get my orders",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneFlowToken')) {",
+                  "  console.log('SKIP phone orders: phoneFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Cancel order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{phoneFlowOrderId}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneFlowToken')) {",
+                  "  console.log('SKIP phone cancel order: phoneFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('phoneFlowOrderId')) {",
+                  "  console.log('SKIP phone cancel order: phoneFlowOrderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 or 400', function () { pm.expect([204, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phone Flow: Cancel subscription",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/{{phoneFlowSubscriptionId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('phoneFlowToken')) {",
+                  "  console.log('SKIP phone cancel subscription: phoneFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('phoneFlowSubscriptionId')) {",
+                  "  console.log('SKIP phone cancel subscription: phoneFlowSubscriptionId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204, 400 or 403', function () { pm.expect([204, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Webhook /start sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 2001,\n  \"message\": {\n    \"message_id\": 21,\n    \"chat\": {\n      \"id\": 123456789,\n      \"first_name\": \"Postman\",\n      \"type\": \"private\"\n    },\n    \"date\": 1700000000,\n    \"text\": \"/start\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/telegram/webhook"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Signed login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": {{tgFlowTelegramId}},\n  \"first_name\": \"{{tgFlowFirstName}}\",\n  \"last_name\": \"{{tgFlowLastName}}\",\n  \"username\": \"{{tgFlowUsername}}\",\n  \"photo_url\": \"\",\n  \"auth_date\": {{tgFlowAuthDate}},\n  \"hash\": \"{{tgFlowHash}}\",\n  \"phone_number\": \"{{tgFlowPhone}}\",\n  \"init_data\": \"{{tgFlowInitData}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/telegram/login"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('tgFlowFirstName')) pm.environment.set('tgFlowFirstName', 'TG');",
+                  "if (!pm.environment.get('tgFlowLastName')) pm.environment.set('tgFlowLastName', 'E2E');",
+                  "if (!pm.environment.get('tgFlowUsername')) pm.environment.set('tgFlowUsername', 'tg_e2e_user');",
+                  "let tgId = pm.environment.get('tgFlowTelegramId');",
+                  "if (!tgId) {",
+                  "  tgId = String(700000000 + Math.floor(Math.random() * 200000000));",
+                  "  pm.environment.set('tgFlowTelegramId', tgId);",
+                  "}",
+                  "let phone = pm.environment.get('tgFlowPhone');",
+                  "if (!phone || !/^\\+7\\d{10}$/.test(phone)) {",
+                  "  const random10 = Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');",
+                  "  phone = '+7' + random10;",
+                  "  pm.environment.set('tgFlowPhone', phone);",
+                  "}",
+                  "const firstName = pm.environment.get('tgFlowFirstName');",
+                  "const lastName = pm.environment.get('tgFlowLastName');",
+                  "const username = pm.environment.get('tgFlowUsername');",
+                  "const botToken = pm.environment.get('telegramBotToken') || '';",
+                  "const authDate = String(Math.floor(Date.now() / 1000));",
+                  "const userObj = {",
+                  "  id: Number(tgId),",
+                  "  first_name: firstName,",
+                  "  last_name: lastName,",
+                  "  username: username",
+                  "};",
+                  "const userJson = JSON.stringify(userObj);",
+                  "const dataMap = { auth_date: authDate, user: userJson };",
+                  "const dataCheckString = Object.keys(dataMap)",
+                  "  .sort()",
+                  "  .map((k) => `${k}=${dataMap[k]}`)",
+                  "  .join('\\n');",
+                  "const secretKey = CryptoJS.HmacSHA256('WebAppData', botToken);",
+                  "const hash = CryptoJS.HmacSHA256(dataCheckString, secretKey).toString(CryptoJS.enc.Hex);",
+                  "const initDataMap = { ...dataMap, hash };",
+                  "const initData = Object.keys(initDataMap)",
+                  "  .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(initDataMap[k])}`)",
+                  "  .join('&');",
+                  "pm.environment.set('tgFlowAuthDate', authDate);",
+                  "pm.environment.set('tgFlowHash', hash);",
+                  "pm.environment.set('tgFlowInitData', initData);",
+                  "pm.environment.unset('tgFlowToken');",
+                  "pm.environment.unset('tgFlowSubscriptionId');",
+                  "pm.environment.unset('tgFlowOrderId');",
+                  "pm.environment.unset('tgFlowAcceptedOrderId');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success=true', function () { pm.expect(body.success).to.eql(true); });",
+                  "pm.environment.set('tgFlowToken', body.data.token);",
+                  "pm.environment.set('tgFlowUserId', String(body.data.user.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Get profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/me"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('tgFlowToken')) {",
+                  "  console.log('SKIP tg profile: tgFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Create subscription",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"WEEKLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/subscriptions"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('tgFlowToken')) {",
+                  "  console.log('SKIP tg subscription: tgFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 403', function () { pm.expect([201, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('tgFlowSubscriptionId', String(body.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Get active subscriptions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/active"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('tgFlowToken')) {",
+                  "  console.log('SKIP tg active subscriptions: tgFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "if (!pm.environment.get('tgFlowSubscriptionId') && body.length > 0) {",
+                  "  pm.environment.set('tgFlowSubscriptionId', String(body[0].id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Create order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{tgFlowOrderPayload}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('tgFlowToken')) {",
+                  "  console.log('SKIP tg create order: tgFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "const pickup = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();",
+                  "const payload = {",
+                  "  address: 'Москва, Тверская улица, 1',",
+                  "  pickupTime: pickup,",
+                  "  comment: 'Telegram flow order',",
+                  "  lat: 55.7558,",
+                  "  lng: 37.6176",
+                  "};",
+                  "const subId = pm.environment.get('tgFlowSubscriptionId');",
+                  "if (subId) payload.subscriptionId = Number(subId);",
+                  "pm.environment.set('tgFlowOrderPayload', JSON.stringify(payload, null, 2));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 400', function () { pm.expect([201, 400]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('tgFlowOrderId', String(body.id));",
+                  "} else {",
+                  "  console.log('Telegram create order failed:', body.message || pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Get my orders",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('tgFlowToken')) {",
+                  "  console.log('SKIP tg orders: tgFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Courier login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{courierPhone}}\",\n  \"password\": \"{{courierPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.environment.get('runCourierLifecycle')).toLowerCase() !== 'true') {",
+                  "  console.log('SKIP courier lifecycle: set runCourierLifecycle=true to enable');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('courierPhone') || !pm.environment.get('courierPassword')) {",
+                  "  console.log('SKIP courier login: set courierPhone/courierPassword');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status = 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('courierToken', body.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Courier accept Telegram order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{courierToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{tgFlowOrderId}}/accept"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.environment.get('runCourierLifecycle')).toLowerCase() !== 'true') {",
+                  "  console.log('SKIP courier lifecycle: runCourierLifecycle=false');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('courierToken')) {",
+                  "  console.log('SKIP courier accept: courierToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('tgFlowOrderId')) {",
+                  "  console.log('SKIP courier accept: tgFlowOrderId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.environment.set('tgFlowAcceptedOrderId', String(body.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Courier set ON_THE_WAY",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{courierToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ON_THE_WAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders/{{tgFlowAcceptedOrderId}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.environment.get('runCourierLifecycle')).toLowerCase() !== 'true') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('courierToken') || !pm.environment.get('tgFlowAcceptedOrderId')) {",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Courier set PICKED_UP",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{courierToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PICKED_UP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders/{{tgFlowAcceptedOrderId}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.environment.get('runCourierLifecycle')).toLowerCase() !== 'true') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('courierToken') || !pm.environment.get('tgFlowAcceptedOrderId')) {",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Courier set COMPLETED",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{courierToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/orders/{{tgFlowAcceptedOrderId}}/status"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.environment.get('runCourierLifecycle')).toLowerCase() !== 'true') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('courierToken') || !pm.environment.get('tgFlowAcceptedOrderId')) {",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, 400 or 403', function () { pm.expect([200, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E Optional: Telegram client get order by id",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{tgFlowAcceptedOrderId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.environment.get('runCourierLifecycle')).toLowerCase() !== 'true') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('tgFlowToken') || !pm.environment.get('tgFlowAcceptedOrderId')) {",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404', function () { pm.expect([200, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Cancel order (non-courier path)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/orders/{{tgFlowOrderId}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.environment.get('runCourierLifecycle')).toLowerCase() === 'true') {",
+                  "  console.log('SKIP telegram cancel order: courier lifecycle enabled');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('tgFlowToken') || !pm.environment.get('tgFlowOrderId')) {",
+                  "  console.log('SKIP telegram cancel order: missing token or orderId');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 or 400', function () { pm.expect([204, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telegram Flow: Cancel subscription",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tgFlowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/subscriptions/{{tgFlowSubscriptionId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('tgFlowToken')) {",
+                  "  console.log('SKIP telegram cancel subscription: tgFlowToken is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (!pm.environment.get('tgFlowSubscriptionId')) {",
+                  "  console.log('SKIP telegram cancel subscription: tgFlowSubscriptionId is empty');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204, 400 or 403', function () { pm.expect([204, 400, 403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8082"
+    }
+  ]
+}
