@@ -46,15 +46,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (jwtService.validate(token)) {
                 try {
                     Long userId = jwtService.getUserIdFromToken(token);
-                    String roleFromToken = jwtService.getRoleFromToken(token);
-
-                    log.debug("JWT authentication - User ID: {}, Role: {}", userId, roleFromToken);
+                    log.debug("JWT authentication - User ID: {}", userId);
 
                     User user = userRepository.findById(userId).orElse(null);
 
                     if (user != null) {
-                        // ИСПРАВЛЕНО: используем isBanned() вместо getBanned()
-                        if (user.isBanned()) {  // <-- ВОТ ТУТ ИСПРАВЬТЕ!
+                        if (user.isBanned()) {
                             log.warn("Banned user attempted access: {}", userId);
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             response.getWriter().write("{\"error\": \"Account banned\"}");
@@ -70,7 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         }
 
                         List<GrantedAuthority> authorities = new ArrayList<>();
-                        authorities.add(new SimpleGrantedAuthority("ROLE_" + roleFromToken));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getUserRole().name()));
 
                         Authentication auth = new UsernamePasswordAuthenticationToken(
                                 user, null, authorities

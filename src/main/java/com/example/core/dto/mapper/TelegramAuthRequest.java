@@ -41,6 +41,9 @@ public class TelegramAuthRequest {
     @JsonProperty("phone_number")
     private String phoneNumber;
 
+    @JsonProperty("init_data")
+    private String initData;
+
     // Дополнительные поля для мини-приложений
     @JsonProperty("query_id")
     private String queryId;

@@ -1,7 +1,6 @@
 package com.example.core.service;
 
 import com.example.core.model.User;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,8 +8,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,7 +16,6 @@ import java.util.Map;
 public class TelegramBotService {
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
 
     @Getter
     @Value("${telegram.bot.token}")
@@ -30,9 +26,8 @@ public class TelegramBotService {
 
     private static final String TELEGRAM_API_URL = "https://api.telegram.org/bot";
 
-    public TelegramBotService(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public TelegramBotService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper;
     }
 
     /**
@@ -51,7 +46,7 @@ public class TelegramBotService {
         try {
             validateBotToken();
             String url = TELEGRAM_API_URL + botToken + "/sendMessage";
-            log.debug("✅ Полный URL Telegram API: {}", url);
+            log.debug("Sending telegram message to chatId={}", chatId);
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("chat_id", chatId);

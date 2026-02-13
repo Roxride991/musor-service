@@ -37,8 +37,10 @@ public class SubscriptionService {
 
         LocalDate startDate = now;
         LocalDate endDate = switch (plan) {
-            case WEEKLY -> startDate.plusWeeks(1);
+            case WEEKLY -> startDate.plusWeeks(2);
             case MONTHLY -> startDate.plusMonths(1);
+            case QUARTERLY -> startDate.plusMonths(3);
+            case YEARLY -> startDate.plusYears(1);
         };
 
         Subscription subscription = Subscription.builder()

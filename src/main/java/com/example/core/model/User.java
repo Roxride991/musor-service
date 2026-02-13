@@ -110,7 +110,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return !banned; // <-- ВАЖНО: возвращаем противоположное значение banned
+        return !isBanned();
     }
 
     @Override
@@ -120,7 +120,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return !banned; // <-- ВАЖНО: возвращаем противоположное значение banned
+        return !isBanned();
     }
 
     // Дополнительные методы

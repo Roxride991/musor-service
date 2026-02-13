@@ -1,3 +1,6 @@
+server:
+  port: ${SERVER_PORT:8082}
+
 spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
@@ -10,18 +13,18 @@ spring:
       fail-on-unknown-properties: false
 
 jwt:
-  secret: ${JWT_SECRET:32-byte-secret-key-for-jwt-256-bit}
+  secret: ${JWT_SECRET:}
 
 telegram:
   bot:
-    token: ${TELEGRAM_BOT_TOKEN:8571956535:AAG2RUettYzBAjYcAPZ7GhB5pGAVDxdW49Y}
+    token: ${TELEGRAM_BOT_TOKEN:}
     username: ${TELEGRAM_BOT_USERNAME:musoren_service_bot}
     webapp-url: ${TELEGRAM_BOT_WEBAPP_URL:https://musoren-front.vercel.app}
-    skip-validation: ${TELEGRAM_SKIP_VALIDATION:true}  # true для тестирования
+    skip-validation: ${TELEGRAM_SKIP_VALIDATION:false}
 
 geocoder:
   yandex:
-    api-key: "65373eca-d019-48a8-b08b-3ab099810d22"
+    api-key: ${YANDEX_GEOCODER_API_KEY:}
     url: "https://geocode-maps.yandex.ru/1.x/"
     timeout: 5000
 
@@ -41,19 +44,16 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: true
   flyway:
     enabled: true
+    validate-on-migrate: false
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-
-telegram:
-  bot:
-    token: 8571956535:AAG2RUettYzBAjYcAPZ7GhB5pGAVDxdW49Y
 
 ---
 spring:
@@ -61,9 +61,9 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -79,7 +79,7 @@ spring:
 
 telegram:
   bot:
-    token: ${TELEGRAM_BOT_TOKEN}
+    token: ${TELEGRAM_BOT_TOKEN:}
 
 sms:
   ru:

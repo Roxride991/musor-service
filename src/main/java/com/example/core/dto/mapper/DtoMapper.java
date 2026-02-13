@@ -9,6 +9,10 @@ import com.example.core.repository.PaymentRepository;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Маппер для преобразования Entity в DTO.
@@ -68,15 +72,53 @@ public class DtoMapper {
 
     /** Преобразует заказ в DTO с указанием, является ли он доступным (для курьера). */
     public OrderResponse toOrderResponse(Order order, Boolean isAvailable) {
+        return toOrderResponse(order, isAvailable, null);
+    }
+
+    /** Пакетное преобразование заказов в DTO с одним запросом к платежам. */
+    public List<OrderResponse> toOrderResponses(List<Order> orders) {
+        return toOrderResponses(orders, null);
+    }
+
+    /** Пакетное преобразование заказов в DTO с одним запросом к платежам. */
+    public List<OrderResponse> toOrderResponses(List<Order> orders, Boolean isAvailable) {
+        if (orders == null || orders.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> orderIds = orders.stream()
+                .map(Order::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        Map<Long, BigDecimal> priceByOrderId = new HashMap<>();
+        if (!orderIds.isEmpty()) {
+            for (Payment payment : paymentRepository.findByOrderIdIn(orderIds)) {
+                if (payment != null && payment.getOrder() != null && payment.getOrder().getId() != null) {
+                    priceByOrderId.putIfAbsent(payment.getOrder().getId(), payment.getAmount());
+                }
+            }
+        }
+
+        return orders.stream()
+                .map(order -> toOrderResponse(order, isAvailable, priceByOrderId))
+                .toList();
+    }
+
+    private OrderResponse toOrderResponse(Order order, Boolean isAvailable, Map<Long, BigDecimal> priceByOrderId) {
         if (order == null) {
             return null;
         }
 
-        // Цена из платежа, если создан
-        BigDecimal price = paymentRepository.findByOrderId(order.getId()).stream()
-                .findFirst()
-                .map(Payment::getAmount)
-                .orElse(null);
+        BigDecimal price = null;
+        if (priceByOrderId != null) {
+            price = priceByOrderId.get(order.getId());
+        } else {
+            price = paymentRepository.findByOrderId(order.getId()).stream()
+                    .findFirst()
+                    .map(Payment::getAmount)
+                    .orElse(null);
+        }
 
         OrderResponse.OrderResponseBuilder builder = OrderResponse.builder()
                 .id(order.getId())

@@ -5,6 +5,8 @@ import com.example.core.model.User;
 import com.example.core.model.UserRole;
 import com.example.core.repository.UserRepository;
 import com.example.core.security.JwtService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -29,6 +32,7 @@ public class TelegramAuthService {
     private final PhoneValidationService phoneValidationService;
     private final PasswordEncoder passwordEncoder;
     private final TelegramBotService telegramBotService;
+    private final ObjectMapper objectMapper;
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -99,98 +103,123 @@ public class TelegramAuthService {
 
     /**
      * Проверяет подпись Telegram Web App
-     * Telegram отправляет данные в формате initData
+     * Telegram отправляет данные в формате initData (raw query string).
      */
     public boolean verifyTelegramData(TelegramAuthRequest request) {
         try {
-            // 1. Проверка времени (данные действительны 24 часа)
-            long currentTime = Instant.now().getEpochSecond();
-            long dataAge = currentTime - request.getAuthDate();
+            String initData = request.getInitData();
+            if (initData == null || initData.isBlank()) {
+                log.warn("Telegram init_data is missing");
+                return false;
+            }
 
-            if (dataAge > 86400) { // 24 часа
+            Map<String, String> initDataMap = parseInitData(initData);
+            String receivedHash = initDataMap.remove("hash");
+            if (receivedHash == null || receivedHash.isBlank()) {
+                log.warn("Telegram init_data hash is missing");
+                return false;
+            }
+
+            String authDateRaw = initDataMap.get("auth_date");
+            if (authDateRaw == null || authDateRaw.isBlank()) {
+                log.warn("Telegram auth_date is missing in init_data");
+                return false;
+            }
+
+            long authDate = Long.parseLong(authDateRaw);
+            long currentTime = Instant.now().getEpochSecond();
+            long dataAge = currentTime - authDate;
+            if (dataAge < 0 || dataAge > 86400) {
                 log.warn("Expired Telegram data: {} seconds old", dataAge);
                 return false;
             }
 
-            // 2. Подготавливаем данные для проверки
-            Map<String, String> dataCheck = new TreeMap<>();
+            String dataCheckString = initDataMap.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(e -> e.getKey() + "=" + e.getValue())
+                    .collect(Collectors.joining("\n"));
 
-            // Добавляем все поля, которые были в initData
-            dataCheck.put("auth_date", request.getAuthDate().toString());
-            dataCheck.put("first_name", request.getFirstName());
-            dataCheck.put("id", request.getTelegramId().toString());
-
-            if (request.getLastName() != null && !request.getLastName().isEmpty()) {
-                dataCheck.put("last_name", request.getLastName());
-            }
-
-            if (request.getUsername() != null && !request.getUsername().isEmpty()) {
-                dataCheck.put("username", request.getUsername());
-            }
-
-            if (request.getPhotoUrl() != null && !request.getPhotoUrl().isEmpty()) {
-                dataCheck.put("photo_url", request.getPhotoUrl());
-            }
-
-            // Важно: phone_number добавляем только если он есть
-            if (request.getPhoneNumber() != null && !request.getPhoneNumber().isEmpty()) {
-                dataCheck.put("phone_number", request.getPhoneNumber());
-            }
-
-            // 3. Создаем строку для проверки в формате "key=value\n"
-            StringBuilder dataCheckString = new StringBuilder();
-            for (Map.Entry<String, String> entry : dataCheck.entrySet()) {
-                dataCheckString.append(entry.getKey())
-                        .append("=")
-                        .append(entry.getValue())
-                        .append("\n");
-            }
-
-            // Убираем последний \n
-            if (dataCheckString.length() > 0) {
-                dataCheckString.setLength(dataCheckString.length() - 1);
-            }
-
-            log.debug("Data check string: {}", dataCheckString);
-
-            // 4. Вычисляем секретный ключ из токена бота
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] secretKey = digest.digest(botToken.getBytes(StandardCharsets.UTF_8));
-
-            // 5. Вычисляем HMAC-SHA256 подпись
-            Mac sha256HMAC = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey, "HmacSHA256");
-            sha256HMAC.init(secretKeySpec);
-
-            byte[] hashBytes = sha256HMAC.doFinal(
-                    dataCheckString.toString().getBytes(StandardCharsets.UTF_8)
+            // Telegram WebApp secret key: HMAC_SHA256("WebAppData", bot_token)
+            byte[] secretKey = hmacSha256(
+                    "WebAppData".getBytes(StandardCharsets.UTF_8),
+                    botToken.getBytes(StandardCharsets.UTF_8)
             );
+            byte[] calculatedHashBytes = hmacSha256(
+                    secretKey,
+                    dataCheckString.getBytes(StandardCharsets.UTF_8)
+            );
+            String calculatedHash = toHex(calculatedHashBytes);
 
-            // 6. Конвертируем в hex (нижний регистр)
-            StringBuilder hexHash = new StringBuilder();
-            for (byte b : hashBytes) {
-                hexHash.append(String.format("%02x", b));
-            }
-
-            String calculatedHash = hexHash.toString();
-            String receivedHash = request.getHash();
-
-            // 7. Сравниваем хэши (регистр важен!)
-            boolean isValid = calculatedHash.equals(receivedHash);
-
+            boolean isValid = MessageDigest.isEqual(
+                    calculatedHash.getBytes(StandardCharsets.UTF_8),
+                    receivedHash.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8)
+            );
             if (!isValid) {
-                log.error("Telegram hash mismatch!");
-                log.error("Calculated: {}", calculatedHash);
-                log.error("Received: {}", receivedHash);
-                log.error("Data string: {}", dataCheckString);
+                log.warn("Telegram hash mismatch for telegramId={}", request.getTelegramId());
+                return false;
             }
 
-            return isValid;
+            // Берем user-данные только из подписанного init_data.
+            String userJson = initDataMap.get("user");
+            if (userJson == null || userJson.isBlank()) {
+                log.warn("Telegram init_data does not contain user object");
+                return false;
+            }
+
+            JsonNode userNode = objectMapper.readTree(userJson);
+            long telegramId = userNode.path("id").asLong(0L);
+            if (telegramId <= 0) {
+                log.warn("Telegram user id is invalid in init_data");
+                return false;
+            }
+            String firstName = userNode.path("first_name").asText("");
+            if (firstName.isBlank()) {
+                log.warn("Telegram first_name is missing in init_data");
+                return false;
+            }
+
+            request.setTelegramId(telegramId);
+            request.setFirstName(firstName);
+            request.setLastName(userNode.path("last_name").asText(""));
+            request.setUsername(userNode.path("username").asText(""));
+            request.setPhotoUrl(userNode.path("photo_url").asText(""));
+            request.setAuthDate(authDate);
+
+            return true;
 
         } catch (Exception e) {
             log.error("Error verifying Telegram data", e);
             return false;
         }
+    }
+
+    private Map<String, String> parseInitData(String initDataRaw) {
+        Map<String, String> data = new HashMap<>();
+        String[] parts = initDataRaw.split("&");
+        for (String part : parts) {
+            int idx = part.indexOf('=');
+            if (idx <= 0) {
+                continue;
+            }
+            String key = java.net.URLDecoder.decode(part.substring(0, idx), StandardCharsets.UTF_8);
+            String value = java.net.URLDecoder.decode(part.substring(idx + 1), StandardCharsets.UTF_8);
+            data.put(key, value);
+        }
+        return data;
+    }
+
+    private byte[] hmacSha256(byte[] key, byte[] payload) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(key, "HmacSHA256"));
+        return mac.doFinal(payload);
+    }
+
+    private String toHex(byte[] bytes) {
+        StringBuilder hex = new StringBuilder();
+        for (byte b : bytes) {
+            hex.append(String.format("%02x", b));
+        }
+        return hex.toString();
     }
 
     /**

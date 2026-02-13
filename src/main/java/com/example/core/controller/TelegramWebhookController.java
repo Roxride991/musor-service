@@ -10,10 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,9 +36,10 @@ public class TelegramWebhookController {
     @PostMapping("/webhook")
     public ResponseEntity<?> handleWebhook(@RequestBody String payload) {
         try {
-            log.info("Telegram webhook received: {}", payload);
+            log.debug("Telegram webhook received (payloadSize={} bytes)", payload != null ? payload.length() : 0);
 
             JsonNode root = objectMapper.readTree(payload);
+            long updateId = root.path("update_id").asLong(-1);
 
             // Проверяем, что это сообщение
             JsonNode message = root.has("message") ? root.get("message") :
@@ -53,12 +54,12 @@ public class TelegramWebhookController {
                 String firstName = chat.has("first_name") ?
                         chat.get("first_name").asText() : "Пользователь";
 
-                log.info("Processing message from chat {}: {}", chatId, text);
+                log.info("Processing telegram command updateId={} chatId={} text={}", updateId, chatId, text);
 
                 // Обрабатываем команды
                 handleCommand(chatId, text, firstName);
             } else {
-                log.debug("Received update without text message: {}", payload);
+                log.debug("Telegram update without text message, updateId={}", updateId);
             }
 
             // Всегда возвращаем OK для Telegram
@@ -76,7 +77,8 @@ public class TelegramWebhookController {
     @PostMapping("/auth/telegram")
     public ResponseEntity<?> handleTelegramAuth(@RequestBody TelegramAuthRequest request) {
         try {
-            log.info("Telegram auth request received: {}", request);
+            log.info("Telegram auth request received: telegramId={}, username={}",
+                    request.getTelegramId(), request.getUsername());
 
             Map<String, Object> authResult = telegramAuthService.authenticateTelegram(request);
 
@@ -193,6 +195,7 @@ public class TelegramWebhookController {
     /**
      * Устанавливает вебхук для бота
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/set-webhook")
     public ResponseEntity<?> setWebhook(@RequestParam String webhookUrl) {
         try {
@@ -223,6 +226,7 @@ public class TelegramWebhookController {
     /**
      * Удаляет вебхук
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/delete-webhook")
     public ResponseEntity<?> deleteWebhook() {
         try {
@@ -250,6 +254,7 @@ public class TelegramWebhookController {
     /**
      * Получает информацию о вебхуке
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/webhook-info")
     public ResponseEntity<?> getWebhookInfo() {
         try {
@@ -276,6 +281,7 @@ public class TelegramWebhookController {
     /**
      * Проверяет, что бот работает
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/test")
     public ResponseEntity<?> testBot() {
         try {

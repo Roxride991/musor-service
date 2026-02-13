@@ -5,9 +5,13 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
 
 @Slf4j
@@ -16,12 +20,30 @@ public class JwtService {
 
     private final SecretKey key;
     private final long validityInMs = 3600_000; // 1 час
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    public JwtService(@Value("${jwt.secret:32-byte-secret-key-for-jwt-256-bit}") String secret) {
-        String secretKey = secret != null && !secret.trim().isEmpty()
-                ? secret
-                : "32-byte-secret-key-for-jwt-256-bit";
-        this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
+    public JwtService(@Value("${jwt.secret:}") String secret, Environment environment) {
+        String effectiveSecret = secret;
+
+        if (effectiveSecret == null || effectiveSecret.trim().isEmpty()) {
+            boolean localOrTest = Arrays.stream(environment.getActiveProfiles())
+                    .anyMatch(profile -> "local".equals(profile) || "test".equals(profile));
+
+            if (!localOrTest) {
+                throw new IllegalStateException("JWT secret is not configured");
+            }
+
+            byte[] randomBytes = new byte[48];
+            SECURE_RANDOM.nextBytes(randomBytes);
+            effectiveSecret = Base64.getEncoder().encodeToString(randomBytes);
+            log.warn("JWT_SECRET is not configured for local/test profile. Generated ephemeral secret for this process.");
+        }
+
+        byte[] secretBytes = effectiveSecret.getBytes();
+        if (secretBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 bytes");
+        }
+        this.key = Keys.hmacShaKeyFor(secretBytes);
     }
 
     public String generateToken(User user) {

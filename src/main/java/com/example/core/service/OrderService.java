@@ -8,13 +8,24 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
+
+    private static final LocalTime SLOT_1_START = LocalTime.of(8, 0);
+    private static final LocalTime SLOT_1_END = LocalTime.of(11, 0);
+    private static final LocalTime SLOT_2_START = LocalTime.of(13, 0);
+    private static final LocalTime SLOT_2_END = LocalTime.of(16, 0);
+    private static final LocalTime SLOT_3_START = LocalTime.of(19, 0);
+    private static final LocalTime SLOT_3_END = LocalTime.of(21, 0);
 
     private final OrderRepository orderRepository;
     private final ServiceZoneRepository zoneRepository;
@@ -43,13 +54,7 @@ public class OrderService {
             throw new IllegalArgumentException("Адрес вне зоны обслуживания");
         }
 
-        OffsetDateTime now = OffsetDateTime.now();
-        if (pickupTime.isBefore(now.plusHours(1))) {
-            throw new IllegalArgumentException("Время вывоза должно быть не ранее чем через 1 час");
-        }
-        if (pickupTime.isAfter(now.plusDays(7))) {
-            throw new IllegalArgumentException("Максимальный срок — 7 дней");
-        }
+        validatePickupTime(pickupTime);
 
         if (subscription != null) {
             if (!subscription.hasAvailableOrders()) {
@@ -77,6 +82,39 @@ public class OrderService {
         }
 
         return saved;
+    }
+
+    private void validatePickupTime(OffsetDateTime pickupTime) {
+        if (pickupTime == null) {
+            throw new IllegalArgumentException("Время вывоза обязательно");
+        }
+
+        Instant now = Instant.now();
+        Instant pickupInstant = pickupTime.toInstant();
+
+        if (pickupInstant.isBefore(now.plus(1, ChronoUnit.HOURS))) {
+            throw new IllegalArgumentException("Время вывоза должно быть не ранее чем через 1 час");
+        }
+        if (pickupInstant.isAfter(now.plus(7, ChronoUnit.DAYS))) {
+            throw new IllegalArgumentException("Максимальный срок — 7 дней");
+        }
+
+        LocalTime localPickupTime = pickupTime.atZoneSameInstant(ZoneId.systemDefault()).toLocalTime();
+        if (!isAllowedTimeSlot(localPickupTime)) {
+            throw new IllegalArgumentException(
+                    "Доступные интервалы вывоза: 08:00-11:00, 13:00-16:00, 19:00-21:00"
+            );
+        }
+    }
+
+    private boolean isAllowedTimeSlot(LocalTime time) {
+        return isInSlot(time, SLOT_1_START, SLOT_1_END)
+                || isInSlot(time, SLOT_2_START, SLOT_2_END)
+                || isInSlot(time, SLOT_3_START, SLOT_3_END);
+    }
+
+    private boolean isInSlot(LocalTime time, LocalTime start, LocalTime endExclusive) {
+        return !time.isBefore(start) && time.isBefore(endExclusive);
     }
 
     private boolean isAddressInServiceZone(Double lat, Double lng) {
@@ -115,6 +153,7 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.CANCELLED_BY_CUSTOMER);
+        restoreSubscriptionUsageIfNeeded(order);
         return orderRepository.save(order);
     }
 
@@ -204,7 +243,22 @@ public class OrderService {
         }
 
         order.setStatus(newStatus);
+        if (newStatus == OrderStatus.CANCELLED_BY_COURIER) {
+            restoreSubscriptionUsageIfNeeded(order);
+        }
         return orderRepository.save(order);
+    }
+
+    private void restoreSubscriptionUsageIfNeeded(Order order) {
+        Subscription subscription = order.getSubscription();
+        if (subscription == null) {
+            return;
+        }
+
+        if (subscription.getUsedOrders() > 0) {
+            subscription.setUsedOrders(subscription.getUsedOrders() - 1);
+            subscriptionRepository.save(subscription);
+        }
     }
 
     public List<Order> getAllOrders(User admin) {

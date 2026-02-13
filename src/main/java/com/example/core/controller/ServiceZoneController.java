@@ -8,6 +8,8 @@ import com.example.core.repository.ServiceZoneRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,6 +33,7 @@ public class ServiceZoneController {
     }
 
     @PostMapping
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public ResponseEntity<ServiceZone> setActiveZone(
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody CreateServiceZoneRequest request) {
@@ -39,9 +42,8 @@ public class ServiceZoneController {
             return ResponseEntity.status(403).build();
         }
 
-        // Деактивировать все активные зоны
-        zoneRepository.findByActiveTrue().forEach(z -> z.setActive(false));
-        zoneRepository.flush(); // сохранить изменения немедленно
+        // Деактивировать все активные зоны атомарно внутри транзакции.
+        zoneRepository.deactivateAllActiveZones();
 
         List<ServiceZone.Coordinate> coordinates = request.getCoordinates().stream()
                 .map(dto -> new ServiceZone.Coordinate(dto.getLat(), dto.getLng()))

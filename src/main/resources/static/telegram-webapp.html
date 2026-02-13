@@ -256,7 +256,8 @@
                     photo_url: userData.photo_url || '',
                     auth_date: tg.initDataUnsafe.auth_date,
                     hash: tg.initDataUnsafe.hash,
-                    phone_number: userData.phone_number
+                    phone_number: userData.phone_number,
+                    init_data: tg.initData
                 };
 
                 // Отправляем запрос на наш сервер

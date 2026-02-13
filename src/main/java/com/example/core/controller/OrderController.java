@@ -14,7 +14,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -72,9 +71,15 @@ public class OrderController {
             Double lng = request.getLng();
 
             if (lat == null || lng == null) {
-                ServiceZone.Coordinate coord = geocodingService.getCoordinates(request.getAddress());
-                lat = coord.getLat();
-                lng = coord.getLng();
+                try {
+                    ServiceZone.Coordinate coord = geocodingService.getCoordinates(request.getAddress());
+                    lat = coord.getLat();
+                    lng = coord.getLng();
+                } catch (IllegalStateException geocodingError) {
+                    throw new IllegalArgumentException(
+                            "Не удалось определить координаты по адресу. Выберите адрес из подсказки или отметьте точку на карте."
+                    );
+                }
             }
 
             // Используем freshUser вместо currentUser
@@ -104,6 +109,27 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/address/suggestions")
+    public ResponseEntity<List<AddressSuggestionResponse>> getAddressSuggestions(
+            @RequestParam("q") String query,
+            @RequestParam(value = "limit", defaultValue = "5") int limit
+    ) {
+        try {
+            List<AddressSuggestionResponse> suggestions = geocodingService.suggestAddresses(query, limit).stream()
+                    .map(item -> AddressSuggestionResponse.builder()
+                            .address(item.address())
+                            .lat(item.lat())
+                            .lng(item.lng())
+                            .build())
+                    .toList();
+            return ResponseEntity.ok(suggestions);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(List.of());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
     @GetMapping
     public ResponseEntity<List<OrderResponse>> getOrders(
             @AuthenticationPrincipal User currentUser) {
@@ -122,9 +148,7 @@ public class OrderController {
                 orders = orderService.getAllOrders(currentUser);
             }
 
-            List<OrderResponse> responses = orders.stream()
-                    .map(dtoMapper::toOrderResponse)
-                    .collect(Collectors.toList());
+            List<OrderResponse> responses = dtoMapper.toOrderResponses(orders);
 
             return ResponseEntity.ok(responses);
         } catch (IllegalStateException e) {
@@ -142,9 +166,7 @@ public class OrderController {
 
         try {
             List<Order> orders = orderService.getAvailableOrdersForCourier(currentUser);
-            List<OrderResponse> responses = orders.stream()
-                    .map(order -> dtoMapper.toOrderResponse(order, true))
-                    .collect(Collectors.toList());
+            List<OrderResponse> responses = dtoMapper.toOrderResponses(orders, true);
             return ResponseEntity.ok(responses);
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -161,9 +183,7 @@ public class OrderController {
 
         try {
             List<Order> orders = orderService.getActiveOrdersForCourier(currentUser);
-            List<OrderResponse> responses = orders.stream()
-                    .map(order -> dtoMapper.toOrderResponse(order, false))
-                    .collect(Collectors.toList());
+            List<OrderResponse> responses = dtoMapper.toOrderResponses(orders, false);
             return ResponseEntity.ok(responses);
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -220,8 +240,10 @@ public class OrderController {
 
             OrderResponse response = dtoMapper.toOrderResponse(order);
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
     }
 

@@ -6,11 +6,13 @@ import com.example.core.dto.mapper.DtoMapper;
 import com.example.core.model.User;
 import com.example.core.service.SubscriptionService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -31,7 +33,7 @@ public class SubscriptionController {
 
     /** Оформить новую подписку текущему пользователю. */
     @PostMapping
-    public ResponseEntity<SubscriptionResponse> createSubscription(
+    public ResponseEntity<?> createSubscription(
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody CreateSubscriptionRequest request) {
 
@@ -39,8 +41,10 @@ public class SubscriptionController {
             var subscription = subscriptionService.createSubscription(currentUser, request.getPlan());
             var response = dtoMapper.toSubscriptionResponse(subscription);
             return ResponseEntity.status(201).body(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+        } catch (IllegalArgumentException e) {
+            return error(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            return error(HttpStatus.CONFLICT, e.getMessage());
         }
     }
 
@@ -77,14 +81,16 @@ public class SubscriptionController {
         try {
             subscriptionService.cancelSubscription(id, currentUser);
             return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+        } catch (IllegalArgumentException e) {
+            return error(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            return error(HttpStatus.CONFLICT, e.getMessage());
         }
     }
 
     /** Приостановить активную подписку (статус PAUSED). */
     @PatchMapping("/{id}/pause")
-    public ResponseEntity<SubscriptionResponse> pauseSubscription(
+    public ResponseEntity<?> pauseSubscription(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
 
@@ -92,14 +98,16 @@ public class SubscriptionController {
             var subscription = subscriptionService.pauseSubscription(id, currentUser);
             var response = dtoMapper.toSubscriptionResponse(subscription);
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+        } catch (IllegalArgumentException e) {
+            return error(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            return error(HttpStatus.CONFLICT, e.getMessage());
         }
     }
 
     /** Возобновить приостановленную подписку (статус ACTIVE). */
     @PatchMapping("/{id}/resume")
-    public ResponseEntity<SubscriptionResponse> resumeSubscription(
+    public ResponseEntity<?> resumeSubscription(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
 
@@ -107,8 +115,15 @@ public class SubscriptionController {
             var subscription = subscriptionService.resumeSubscription(id, currentUser);
             var response = dtoMapper.toSubscriptionResponse(subscription);
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+        } catch (IllegalArgumentException e) {
+            return error(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            return error(HttpStatus.CONFLICT, e.getMessage());
         }
+    }
+
+    private ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
+        String safeMessage = (message == null || message.isBlank()) ? "Ошибка запроса" : message;
+        return ResponseEntity.status(status).body(Map.of("message", safeMessage));
     }
 }
