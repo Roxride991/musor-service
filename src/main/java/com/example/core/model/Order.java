@@ -57,6 +57,12 @@ public class Order {
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
 
+    @Column(name = "lat")
+    private Double lat;
+
+    @Column(name = "lng")
+    private Double lng;
+
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

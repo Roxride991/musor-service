@@ -5,12 +5,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -59,10 +65,26 @@ public class SecurityConfig {
 
                 // Отключаем CSRF для REST API
                 .csrf(csrf -> csrf.disable())
+                // Отключаем stateful login-механизмы, используем только JWT
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
 
                 // Настройка сессий как STATELESS (для JWT)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
+                // Для неаутентифицированных запросов возвращаем 401, а не 403
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                            boolean isAnonymous = authentication == null
+                                    || authentication instanceof AnonymousAuthenticationToken
+                                    || !authentication.isAuthenticated();
+                            response.sendError(isAnonymous ? HttpStatus.UNAUTHORIZED.value() : HttpStatus.FORBIDDEN.value());
+                        })
                 )
 
                 // Настройка авторизации запросов
@@ -73,10 +95,9 @@ public class SecurityConfig {
                         // Публичные endpoints
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/telegram/webhook",
-                                "/api/telegram/auth/telegram",
+                                "/api/payments/webhook/**",
                                 "/api/zones/active",
-                                "/telegram-webapp.html",
+                                "/api/orders/address/suggestions",
                                 "/static/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",

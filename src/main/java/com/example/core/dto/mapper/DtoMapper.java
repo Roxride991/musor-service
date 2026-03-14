@@ -125,6 +125,8 @@ public class DtoMapper {
                 .address(order.getAddress())
                 .pickupTime(order.getPickupTime())
                 .comment(order.getComment())
+                .lat(resolveOrderLat(order))
+                .lng(resolveOrderLng(order))
                 .status(order.getStatus())
                 .price(price)
                 .createdAt(order.getCreatedAt()) // оставляем, если используется во фронтенде
@@ -137,6 +139,32 @@ public class DtoMapper {
         }
 
         return builder.build();
+    }
+
+    private Double resolveOrderLat(Order order) {
+        if (order == null) {
+            return null;
+        }
+        if (order.getLat() != null) {
+            return order.getLat();
+        }
+        if (order.getSubscription() != null) {
+            return order.getSubscription().getServiceLat();
+        }
+        return null;
+    }
+
+    private Double resolveOrderLng(Order order) {
+        if (order == null) {
+            return null;
+        }
+        if (order.getLng() != null) {
+            return order.getLng();
+        }
+        if (order.getSubscription() != null) {
+            return order.getSubscription().getServiceLng();
+        }
+        return null;
     }
 
     // ======================
@@ -154,8 +182,12 @@ public class DtoMapper {
                 .type(payment.getType())
                 .status(payment.getStatus())
                 .amount(payment.getAmount())
+                .currency(payment.getCurrency())
+                .provider(payment.getProvider())
                 .externalId(payment.getExternalId())
+                .confirmationUrl(payment.getConfirmationUrl())
                 .createdAt(payment.getCreatedAt())
+                .updatedAt(payment.getUpdatedAt())
                 // orderId и subscriptionId убраны — не нужны во фронтенде
                 .build();
     }
@@ -173,6 +205,10 @@ public class DtoMapper {
                 s.getTotalAllowedOrders(),
                 s.getUsedOrders(),
                 s.getRemainingOrders(),
+                s.getServiceAddress(),
+                s.getPickupSlot(),
+                s.getCadenceDays(),
+                s.getNextPickupAt(),
                 s.getStartDate(),
                 s.getEndDate(),
                 s.getPrice(),

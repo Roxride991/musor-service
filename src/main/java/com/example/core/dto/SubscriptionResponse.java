@@ -1,5 +1,6 @@
 package com.example.core.dto;
 
+import com.example.core.model.PickupSlot;
 import com.example.core.model.SubscriptionPlan;
 import com.example.core.model.SubscriptionStatus;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -23,6 +24,10 @@ public class SubscriptionResponse {
     int totalAllowedOrders;
     int usedOrders;
     int remainingOrders;
+    String serviceAddress;
+    PickupSlot pickupSlot;
+    int cadenceDays;
+    OffsetDateTime nextPickupAt;
     @JsonFormat(pattern = "yyyy-MM-dd")
     LocalDate startDate;
     @JsonFormat(pattern = "yyyy-MM-dd")

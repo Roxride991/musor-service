@@ -1,9 +1,21 @@
 server:
   port: ${SERVER_PORT:8082}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: core
+
 spring:
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   jackson:
     date-format: dd.MM.yyyy HH:mm
     time-zone: Europe/Moscow
@@ -14,13 +26,21 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET:}
+  allow-local-fallback: ${JWT_ALLOW_LOCAL_FALLBACK:false}
+
+security:
+  trust-forward-headers: ${SECURITY_TRUST_FORWARD_HEADERS:false}
+  trusted-proxies: ${SECURITY_TRUSTED_PROXIES:127.0.0.1,::1}
+
+auth:
+  allow-courier-self-registration: ${AUTH_ALLOW_COURIER_SELF_REGISTRATION:false}
 
 telegram:
-  bot:
-    token: ${TELEGRAM_BOT_TOKEN:}
-    username: ${TELEGRAM_BOT_USERNAME:musoren_service_bot}
-    webapp-url: ${TELEGRAM_BOT_WEBAPP_URL:https://musoren-front.vercel.app}
-    skip-validation: ${TELEGRAM_SKIP_VALIDATION:false}
+  auth:
+    bot-username: ${TELEGRAM_BOT_USERNAME:musoren_service_bot}
+    hmac-secret: ${TELEGRAM_AUTH_HMAC_SECRET:}
+    session-ttl-seconds: ${TELEGRAM_LOGIN_SESSION_TTL_SECONDS:600}
+    max-clock-skew-seconds: ${TELEGRAM_AUTH_MAX_CLOCK_SKEW_SECONDS:120}
 
 geocoder:
   yandex:
@@ -31,6 +51,60 @@ geocoder:
 sms:
   ru:
     api-id: ${SMS_RU_API_ID:}
+
+integration:
+  http:
+    connect-timeout-ms: ${HTTP_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${HTTP_READ_TIMEOUT_MS:7000}
+  geocoder:
+    max-retries: ${GEOCODER_MAX_RETRIES:2}
+    retry-backoff-ms: ${GEOCODER_RETRY_BACKOFF_MS:250}
+  sms:
+    max-retries: ${SMS_MAX_RETRIES:2}
+    retry-backoff-ms: ${SMS_RETRY_BACKOFF_MS:300}
+
+monitoring:
+  flow-alert:
+    period-ms: ${FLOW_ALERT_PERIOD_MS:60000}
+    window-minutes: ${FLOW_ALERT_WINDOW_MINUTES:15}
+    min-events: ${FLOW_ALERT_MIN_EVENTS:20}
+    auth-failure-threshold: ${FLOW_ALERT_AUTH_FAILURE_THRESHOLD:0.25}
+    order-failure-threshold: ${FLOW_ALERT_ORDER_FAILURE_THRESHOLD:0.20}
+    telegram-failure-threshold: ${FLOW_ALERT_TELEGRAM_FAILURE_THRESHOLD:0.30}
+
+payments:
+  provider: ${PAYMENTS_PROVIDER:MOCK}
+  mode: ${PAYMENTS_MODE:HYBRID}
+  webhook-token: ${PAYMENTS_WEBHOOK_TOKEN:}
+  default-return-url: ${PAYMENTS_RETURN_URL:http://localhost:5173/profile}
+  one-time-order-amount-rub: ${PAYMENTS_ONE_TIME_ORDER_AMOUNT_RUB:350}
+  yookassa:
+    api-url: ${YOOKASSA_API_URL:https://api.yookassa.ru/v3}
+    shop-id: ${YOOKASSA_SHOP_ID:}
+    secret-key: ${YOOKASSA_SECRET_KEY:}
+
+notifications:
+  dispatch:
+    period-ms: ${NOTIFICATIONS_DISPATCH_PERIOD_MS:30000}
+  reminders:
+    period-ms: ${NOTIFICATIONS_REMINDERS_PERIOD_MS:900000}
+
+dispatch:
+  enabled: ${DISPATCH_ENABLED:true}
+  mode: ${DISPATCH_MODE:MANUAL}
+  auto:
+    period-ms: ${DISPATCH_AUTO_PERIOD_MS:60000}
+    max-assignments-per-run: ${DISPATCH_AUTO_MAX_ASSIGNMENTS_PER_RUN:20}
+  hybrid:
+    lookahead-minutes: ${DISPATCH_HYBRID_LOOKAHEAD_MINUTES:120}
+
+reconciliation:
+  cron: ${RECONCILIATION_CRON:0 */30 * * * *}
+
+storage:
+  proofs:
+    dir: ${PROOFS_STORAGE_DIR:storage/proofs}
+    max-size-bytes: ${PROOFS_MAX_SIZE_BYTES:5242880}
 
 ---
 spring:
@@ -55,6 +129,9 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
+jwt:
+  allow-local-fallback: ${JWT_ALLOW_LOCAL_FALLBACK:true}
+
 ---
 spring:
   config:
@@ -76,10 +153,6 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-
-telegram:
-  bot:
-    token: ${TELEGRAM_BOT_TOKEN:}
 
 sms:
   ru:

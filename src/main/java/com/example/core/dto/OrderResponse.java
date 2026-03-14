@@ -22,6 +22,8 @@ public class OrderResponse {
     private String address;
     private OffsetDateTime pickupTime;
     private String comment;
+    private Double lat;
+    private Double lng;
     private OrderStatus status;
     private BigDecimal price;
     private OffsetDateTime createdAt;

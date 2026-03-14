@@ -22,7 +22,11 @@ public class PaymentResponse {
     private PaymentType type;
     private PaymentStatus status;
     private BigDecimal amount;
+    private String currency;
+    private String provider;
     private String externalId;
+    private String confirmationUrl;
     private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 }
 

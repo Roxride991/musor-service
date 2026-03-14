@@ -9,9 +9,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
-import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Date;
 
 @Slf4j
@@ -20,23 +18,26 @@ public class JwtService {
 
     private final SecretKey key;
     private final long validityInMs = 3600_000; // 1 час
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String LOCAL_DEV_FALLBACK_SECRET =
+            "local-dev-jwt-secret-change-me-please-32-bytes-minimum";
 
-    public JwtService(@Value("${jwt.secret:}") String secret, Environment environment) {
+    public JwtService(
+            @Value("${jwt.secret:}") String secret,
+            @Value("${jwt.allow-local-fallback:true}") boolean allowLocalFallback,
+            Environment environment
+    ) {
         String effectiveSecret = secret;
 
         if (effectiveSecret == null || effectiveSecret.trim().isEmpty()) {
             boolean localOrTest = Arrays.stream(environment.getActiveProfiles())
                     .anyMatch(profile -> "local".equals(profile) || "test".equals(profile));
 
-            if (!localOrTest) {
+            if (!localOrTest || !allowLocalFallback) {
                 throw new IllegalStateException("JWT secret is not configured");
             }
 
-            byte[] randomBytes = new byte[48];
-            SECURE_RANDOM.nextBytes(randomBytes);
-            effectiveSecret = Base64.getEncoder().encodeToString(randomBytes);
-            log.warn("JWT_SECRET is not configured for local/test profile. Generated ephemeral secret for this process.");
+            effectiveSecret = LOCAL_DEV_FALLBACK_SECRET;
+            log.warn("JWT_SECRET is not configured for local/test profile. Using deterministic local fallback secret. Set JWT_ALLOW_LOCAL_FALLBACK=false to disable.");
         }
 
         byte[] secretBytes = effectiveSecret.getBytes();

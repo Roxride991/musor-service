@@ -1,7 +1,9 @@
 package com.example.core.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -11,12 +13,14 @@ import org.springframework.web.client.RestTemplate;
 public class GeocodingConfig {
 
     @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
+    public RestTemplate restTemplate(
+            @Value("${integration.http.connect-timeout-ms:3000}") int connectTimeoutMs,
+            @Value("${integration.http.read-timeout-ms:7000}") int readTimeoutMs
+    ) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Math.max(500, connectTimeoutMs));
+        requestFactory.setReadTimeout(Math.max(1000, readTimeoutMs));
+        return new RestTemplate(requestFactory);
     }
 
-    // Удаляем создание ObjectMapper - Spring Boot автоматически настраивает его
-    // с поддержкой Java 8 time API через spring-boot-starter-web
-    // Если нужен отдельный ObjectMapper для геокодинга, используйте @Qualifier
 }
-

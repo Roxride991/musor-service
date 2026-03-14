@@ -9,6 +9,6 @@ import lombok.Getter;
 @AllArgsConstructor
 public class AddressSuggestionResponse {
     private String address;
-    private double lat;
-    private double lng;
+    private Double lat;
+    private Double lng;
 }

@@ -12,12 +12,12 @@
 1. `00..08` — регрессионные API/security/negative тесты.
 2. `09 Full E2E Cycle` — полный бизнес-цикл:
 - регистрация по номеру (SMS OTP) -> логин -> профиль -> подписка -> заказ -> отмена,
-- вход через Telegram WebApp/бот -> профиль -> подписка -> заказ,
+- вход через Telegram bot session flow (`/api/auth/telegram/init -> status -> verify`) -> профиль -> подписка -> заказ,
 - optional courier lifecycle до `COMPLETED`.
 
 ## Обязательные переменные environment
 - `baseUrl` (обычно `http://localhost:8082`)
-- `telegramBotToken` (должен совпадать с `TELEGRAM_BOT_TOKEN` backend; если в backend токен пустой, оставь пустым)
+- `telegramHmacSecret` (должен совпадать с `TELEGRAM_AUTH_HMAC_SECRET` backend)
 
 ## Для полного цикла по номеру (OTP)
 Заполни перед запуском папки `09 Full E2E Cycle`:
@@ -34,6 +34,10 @@
 - `courierPhone`, `courierPassword`
 
 Если `runCourierLifecycle=false`, сценарий Telegram завершится через клиентскую отмену заказа.
+
+## Важно
+- Старый Telegram WebApp login и Java webhook bot удалены из backend.
+- Используйте только новый flow через `login_session_id` и `POST /api/auth/telegram/verify` с HMAC.
 
 ## Для авто-настройки зоны обслуживания (optional)
 Чтобы заказы гарантированно создавались в E2E, заполни:

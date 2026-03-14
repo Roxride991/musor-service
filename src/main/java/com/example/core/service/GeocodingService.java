@@ -5,7 +5,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -32,6 +38,12 @@ public class GeocodingService {
 
     @Value("${geocoder.yandex.api-key}")
     private String yandexApiKey;
+
+    @Value("${integration.geocoder.max-retries:2}")
+    private int maxRetries;
+
+    @Value("${integration.geocoder.retry-backoff-ms:250}")
+    private long retryBackoffMs;
 
     /**
      * Преобразует адрес в координаты через Яндекс.Геокодер.
@@ -96,49 +108,87 @@ public class GeocodingService {
     }
 
     private JsonNode fetchFeatureMembers(String query, int results) {
+        if (!hasText(yandexApiKey)) {
+            throw new IllegalStateException("Yandex geocoder API key is not configured");
+        }
+
+        String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUriString(YANDEX_GEOCODER_URL)
+                .queryParam("geocode", encodedQuery)
+                .queryParam("format", "json")
+                .queryParam("results", Math.max(1, results))
+                .queryParam("apikey", yandexApiKey.trim());
+        URI uri = builder.build(true).toUri();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("User-Agent", "MusorService/1.0");
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        int attempts = Math.max(1, maxRetries + 1);
+        Exception lastError = null;
+
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                log.debug("Выполняется геокодинг запроса: '{}' (attempt {}/{})", query, attempt, attempts);
+                ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.GET, entity, String.class);
+
+                if (response.getStatusCode().is2xxSuccessful()) {
+                    JsonNode root = objectMapper.readTree(response.getBody());
+                    return root.path("response")
+                            .path("GeoObjectCollection")
+                            .path("featureMember");
+                }
+
+                if (!isRetriableStatus(response.getStatusCode()) || attempt == attempts) {
+                    if (response.getStatusCode().is4xxClientError()) {
+                        if (isProviderAccessError(response.getStatusCode().value())) {
+                            throw new IllegalStateException("Сервис геокодинга временно недоступен");
+                        }
+                        throw new IllegalArgumentException("Адрес не найден в геокодере");
+                    }
+                    throw new IllegalStateException("Сервис геокодинга временно недоступен");
+                }
+
+                sleepBeforeRetry(attempt);
+            } catch (IllegalArgumentException e) {
+                throw e;
+            } catch (RestClientException e) {
+                lastError = e;
+                log.warn("Сетевая ошибка геокодера (attempt {}/{}): {}", attempt, attempts, e.getMessage());
+                if (attempt == attempts) {
+                    break;
+                }
+                sleepBeforeRetry(attempt);
+            } catch (Exception e) {
+                lastError = e;
+                log.warn("Ошибка геокодинга (attempt {}/{}): {}", attempt, attempts, e.getMessage());
+                if (attempt == attempts) {
+                    break;
+                }
+                sleepBeforeRetry(attempt);
+            }
+        }
+
+        log.error("Критическая ошибка при геокодинге запроса: {}", query, lastError);
+        throw new IllegalStateException("Сервис геокодинга временно недоступен", lastError);
+    }
+
+    private boolean isRetriableStatus(HttpStatusCode statusCode) {
+        return statusCode.value() == 429 || statusCode.is5xxServerError();
+    }
+
+    private boolean isProviderAccessError(int statusCode) {
+        return statusCode == 401 || statusCode == 403 || statusCode == 429;
+    }
+
+    private void sleepBeforeRetry(int attempt) {
+        long base = Math.max(50L, retryBackoffMs);
+        long delay = Math.min(2000L, base * attempt);
         try {
-            if (!hasText(yandexApiKey)) {
-                throw new IllegalStateException("Yandex geocoder API key is not configured");
-            }
-
-            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-
-            UriComponentsBuilder builder = UriComponentsBuilder
-                    .fromHttpUrl(YANDEX_GEOCODER_URL)
-                    .queryParam("geocode", encodedQuery)
-                    .queryParam("format", "json")
-                    .queryParam("results", Math.max(1, results))
-                    .queryParam("apikey", yandexApiKey.trim());
-
-            URI uri = builder.build(true).toUri();
-
-            log.debug("Выполняется геокодинг запроса: '{}'", query);
-
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-            headers.set("User-Agent", "MusorService/1.0");
-            org.springframework.http.HttpEntity<Void> entity = new org.springframework.http.HttpEntity<>(headers);
-
-            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(
-                    uri,
-                    org.springframework.http.HttpMethod.GET,
-                    entity,
-                    String.class
-            );
-
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                log.warn("Геокодер вернул статус: {} для запроса: {}", response.getStatusCode(), query);
-                throw new IllegalArgumentException("Геокодер недоступен или вернул ошибку");
-            }
-
-            JsonNode root = objectMapper.readTree(response.getBody());
-            return root.path("response")
-                    .path("GeoObjectCollection")
-                    .path("featureMember");
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Критическая ошибка при геокодинге запроса: {}", query, e);
-            throw new IllegalStateException("Сервис геокодинга временно недоступен", e);
+            Thread.sleep(delay);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
         }
     }
 

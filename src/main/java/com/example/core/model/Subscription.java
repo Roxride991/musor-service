@@ -36,6 +36,33 @@ public class Subscription {
     @Column(nullable = false)
     private LocalDate endDate;
 
+    @Column(name = "service_address", length = 255)
+    private String serviceAddress;
+
+    @Column(name = "service_lat")
+    private Double serviceLat;
+
+    @Column(name = "service_lng")
+    private Double serviceLng;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pickup_slot", length = 32)
+    private PickupSlot pickupSlot;
+
+    @Column(name = "next_pickup_at")
+    private OffsetDateTime nextPickupAt;
+
+    @Column(name = "pause_started_at")
+    private OffsetDateTime pauseStartedAt;
+
+    @Builder.Default
+    @Column(name = "paused_days_used", nullable = false)
+    private int pausedDaysUsed = 0;
+
+    @Builder.Default
+    @Column(name = "cadence_days", nullable = false)
+    private int cadenceDays = 2;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 

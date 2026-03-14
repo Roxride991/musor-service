@@ -1,6 +1,7 @@
 package com.example.core.security;
 
 import com.example.core.model.User;
+import com.example.core.model.UserRole;
 import com.example.core.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -59,7 +60,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         }
 
                         // Проверяем верификацию телефона
-                        if (requiresPhoneVerification(request) && !user.isPhoneVerified()) {
+                        if (requiresPhoneVerification(request, user) && !user.isPhoneVerified()) {
                             log.warn("Phone not verified for user: {}", userId);
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             response.getWriter().write("{\"error\": \"Phone verification required\"}");
@@ -94,8 +95,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /**
      * Проверяет, требует ли endpoint верификации телефона
      */
-    private boolean requiresPhoneVerification(HttpServletRequest request) {
+    private boolean requiresPhoneVerification(HttpServletRequest request, User user) {
+        if (user == null || user.getUserRole() != UserRole.CLIENT) {
+            return false;
+        }
+
         String uri = request.getRequestURI();
+
+        // Для автоподсказок адреса не блокируем доступ,
+        // иначе UX ломается ещё до оформления заказа.
+        if (uri.startsWith("/api/orders/address/suggestions")) {
+            return false;
+        }
 
         // Endpoints, которые требуют верификации телефона
         List<String> protectedEndpoints = List.of(
