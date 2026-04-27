@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -216,11 +218,16 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public List<Payment> getPaymentsForUser(User user) {
+        return getPaymentsForUser(user, Pageable.unpaged()).getContent();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Payment> getPaymentsForUser(User user, Pageable pageable) {
         if (user.getUserRole() == UserRole.ADMIN) {
-            return paymentRepository.findAll();
+            return paymentRepository.findAllByOrderByCreatedAtDesc(pageable);
         }
 
-        return paymentRepository.findVisibleForUser(user.getId());
+        return paymentRepository.findVisibleForUser(user.getId(), pageable);
     }
 
     @Transactional(readOnly = true)

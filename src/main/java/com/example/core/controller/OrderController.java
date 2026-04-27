@@ -10,7 +10,7 @@ import com.example.core.dto.OrderClusteringResponse;
 import com.example.core.dto.OrderResponse;
 import com.example.core.dto.OrderStatsResponse;
 import com.example.core.dto.UpdateOrderStatusRequest;
-import com.example.core.dto.mapper.DtoMapper;
+import com.example.core.mapper.EntityDtoMapper;
 import com.example.core.model.Order;
 import com.example.core.model.OrderStatus;
 import com.example.core.model.NotificationType;
@@ -54,7 +54,7 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
-    private final DtoMapper dtoMapper;
+    private final EntityDtoMapper entityDtoMapper;
     private final OrderRepository orderRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final GeocodingService geocodingService;
@@ -67,7 +67,7 @@ public class OrderController {
 
     public OrderController(
             OrderService orderService,
-            DtoMapper dtoMapper,
+            EntityDtoMapper entityDtoMapper,
             OrderRepository orderRepository,
             SubscriptionRepository subscriptionRepository,
             GeocodingService geocodingService,
@@ -79,7 +79,7 @@ public class OrderController {
             OrderClusteringService orderClusteringService
     ) {
         this.orderService = orderService;
-        this.dtoMapper = dtoMapper;
+        this.entityDtoMapper = entityDtoMapper;
         this.orderRepository = orderRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.geocodingService = geocodingService;
@@ -155,7 +155,7 @@ public class OrderController {
                     order.getSubscription() == null ? null : order.getSubscription().getId(),
                     "order-created-" + order.getId()
             );
-            return ResponseEntity.status(HttpStatus.CREATED).body(dtoMapper.toOrderResponse(order));
+            return ResponseEntity.status(HttpStatus.CREATED).body(entityDtoMapper.toOrderResponse(order));
 
         } catch (IllegalArgumentException e) {
             flowMetricsService.recordOrderCreateFailure();
@@ -273,7 +273,7 @@ public class OrderController {
                 orders = orderService.getAllOrders(currentUser);
             }
 
-            return ResponseEntity.ok(dtoMapper.toOrderResponses(orders));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponses(orders));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -287,7 +287,7 @@ public class OrderController {
 
         try {
             List<Order> orders = orderService.getAvailableOrdersForCourier(currentUser);
-            return ResponseEntity.ok(dtoMapper.toOrderResponses(orders, true));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponses(orders, true));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -301,7 +301,7 @@ public class OrderController {
 
         try {
             List<Order> orders = orderService.getActiveOrdersForCourier(currentUser);
-            return ResponseEntity.ok(dtoMapper.toOrderResponses(orders, false));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponses(orders, false));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -357,7 +357,7 @@ public class OrderController {
                     request.getOrderIds(),
                     request.getRadiusMeters()
             );
-            return ResponseEntity.ok(dtoMapper.toOrderResponses(accepted, false));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponses(accepted, false));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (IllegalStateException e) {
@@ -390,7 +390,7 @@ public class OrderController {
                     .onlyUnassigned(onlyUnassigned)
                     .build();
             List<Order> orders = orderService.getFilteredOrdersForAdmin(currentUser, filter, limit);
-            return ResponseEntity.ok(dtoMapper.toOrderResponses(orders));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponses(orders));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
         }
@@ -443,7 +443,7 @@ public class OrderController {
             if (order == null) {
                 return ResponseEntity.notFound().build();
             }
-            return ResponseEntity.ok(dtoMapper.toOrderResponse(order));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponse(order));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
@@ -541,7 +541,7 @@ public class OrderController {
                         "order-accept-client-" + id
                 );
             }
-            return ResponseEntity.ok(dtoMapper.toOrderResponse(order));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponse(order));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -570,7 +570,7 @@ public class OrderController {
                         "order-status-client-" + id + "-" + order.getStatus()
                 );
             }
-            return ResponseEntity.ok(dtoMapper.toOrderResponse(order));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponse(order));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -599,7 +599,7 @@ public class OrderController {
                         "order-status-admin-client-" + id + "-" + order.getStatus()
                 );
             }
-            return ResponseEntity.ok(dtoMapper.toOrderResponse(order));
+            return ResponseEntity.ok(entityDtoMapper.toOrderResponse(order));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }

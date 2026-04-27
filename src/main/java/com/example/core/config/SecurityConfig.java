@@ -95,7 +95,7 @@ public class SecurityConfig {
                         // Публичные endpoints
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/payments/webhook/**",
+                                "/api/payments/webhooks/**",
                                 "/api/zones/active",
                                 "/api/orders/address/suggestions",
                                 "/static/**",

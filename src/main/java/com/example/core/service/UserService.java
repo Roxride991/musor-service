@@ -1,5 +1,8 @@
 package com.example.core.service;
 
+import com.example.core.exception.BadRequestException;
+import com.example.core.exception.ForbiddenOperationException;
+import com.example.core.exception.ResourceNotFoundException;
 import com.example.core.model.User;
 import com.example.core.model.UserRole;
 import com.example.core.repository.UserRepository;
@@ -21,7 +24,7 @@ public class UserService {
     public User getProfile(User currentUser) {
         // Защита: пользователь может видеть только свой профиль
         return userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь не найден"));
     }
 
     // ======================
@@ -30,12 +33,12 @@ public class UserService {
     @Transactional
     public User updateName(User currentUser, String newName) {
         if (newName == null || newName.trim().isEmpty() || newName.length() > 50) {
-            throw new IllegalArgumentException("Имя должно быть от 1 до 50 символов");
+            throw new BadRequestException("Имя должно быть от 1 до 50 символов");
         }
 
         User user = userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
-        user.setName(newName);
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь не найден"));
+        user.setName(newName.trim());
         return userRepository.save(user);
     }
 
@@ -45,7 +48,7 @@ public class UserService {
     @Transactional
     public void deleteAccount(User currentUser) {
         User user = userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь не найден"));
 
         // Здесь можно добавить:
         // - отмену всех активных заказов
@@ -59,7 +62,7 @@ public class UserService {
     // ======================
     public List<User> getAllUsers(User admin) {
         if (admin.getUserRole() != UserRole.ADMIN) {
-            throw new IllegalStateException("Только администраторы могут просматривать всех пользователей");
+            throw new ForbiddenOperationException("Только администраторы могут просматривать всех пользователей");
         }
         return userRepository.findAll();
     }

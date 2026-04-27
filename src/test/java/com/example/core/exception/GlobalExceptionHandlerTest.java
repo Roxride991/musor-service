@@ -4,6 +4,7 @@ import com.example.core.dto.ErrorResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
@@ -28,11 +29,15 @@ class GlobalExceptionHandlerTest {
         MethodArgumentNotValidException ex = new MethodArgumentNotValidException(methodParameter, bindingResult);
 
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
-        ResponseEntity<ErrorResponse> response = handler.handleValidationExceptions(ex);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/test");
+        ResponseEntity<ErrorResponse> response = handler.handleValidationExceptions(ex, request);
 
         assertEquals(400, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertNotNull(response.getBody().getDetails());
+        assertEquals("validation_failed", response.getBody().getCode());
+        assertEquals("/api/test", response.getBody().getPath());
         assertTrue(response.getBody().getDetails().containsKey("testDto"));
         assertTrue(response.getBody().getDetails().containsKey("phone"));
     }

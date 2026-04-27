@@ -1,6 +1,9 @@
 package com.example.core.service;
 
 import com.example.core.dto.NotificationResponse;
+import com.example.core.dto.PageResponse;
+import com.example.core.exception.ForbiddenOperationException;
+import com.example.core.exception.ResourceNotFoundException;
 import com.example.core.model.NotificationChannel;
 import com.example.core.model.NotificationStatus;
 import com.example.core.model.NotificationType;
@@ -12,6 +15,8 @@ import com.example.core.repository.OrderRepository;
 import com.example.core.repository.UserNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -92,15 +97,34 @@ public class NotificationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<NotificationResponse> listForUser(User user, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(1, Math.min(size, 100));
+        var notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(
+                user.getId(),
+                PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+        );
+        return PageResponse.<NotificationResponse>builder()
+                .content(notifications.getContent().stream().map(this::toResponse).toList())
+                .page(notifications.getNumber())
+                .size(notifications.getSize())
+                .totalElements(notifications.getTotalElements())
+                .totalPages(notifications.getTotalPages())
+                .first(notifications.isFirst())
+                .last(notifications.isLast())
+                .build();
+    }
+
     @Transactional
     public NotificationResponse markAsRead(User user, Long notificationId) {
         UserNotification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("Уведомление не найдено"));
+                .orElseThrow(() -> new ResourceNotFoundException("Уведомление не найдено"));
 
         if (notification.getUser() == null
                 || notification.getUser().getId() == null
                 || !notification.getUser().getId().equals(user.getId())) {
-            throw new IllegalStateException("Уведомление недоступно");
+            throw new ForbiddenOperationException("Уведомление недоступно");
         }
 
         notification.setStatus(NotificationStatus.READ);

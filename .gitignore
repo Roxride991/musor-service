@@ -36,3 +36,7 @@ out/
 ### VS Code ###
 .vscode/
 postgres_data/
+.env
+.env.*
+.DS_Store
+__pycache__/

@@ -2,6 +2,8 @@ package com.example.core.repository;
 
 import com.example.core.model.Payment;
 import com.example.core.model.PaymentStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -48,4 +50,17 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             order by p.createdAt desc
             """)
     List<Payment> findVisibleForUser(@Param("userId") Long userId);
+
+    @Query("""
+            select p
+            from Payment p
+            left join p.order o
+            left join o.client oc
+            left join p.subscription s
+            left join s.user su
+            where oc.id = :userId or su.id = :userId
+            """)
+    Page<Payment> findVisibleForUser(@Param("userId") Long userId, Pageable pageable);
+
+    Page<Payment> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

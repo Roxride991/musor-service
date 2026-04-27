@@ -1,4 +1,4 @@
-package com.example.core.dto.mapper;
+package com.example.core.mapper;
 
 import com.example.core.dto.OrderResponse;
 import com.example.core.model.Order;
@@ -21,12 +21,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class DtoMapperTest {
+class EntityDtoMapperTest {
 
     @Test
     void batchMappingShouldLoadPaymentsInSingleRepositoryCall() {
         PaymentRepository paymentRepository = mock(PaymentRepository.class);
-        DtoMapper mapper = new DtoMapper(paymentRepository);
+        EntityDtoMapper mapper = new EntityDtoMapper(paymentRepository);
 
         User client = User.builder()
                 .id(1L)

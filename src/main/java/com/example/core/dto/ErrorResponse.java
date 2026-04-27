@@ -18,8 +18,9 @@ import java.util.Map;
 public class ErrorResponse {
     private OffsetDateTime timestamp;
     private int status;
+    private String code;
     private String error;
     private String message;
+    private String path;
     private Map<String, String> details; // Для ошибок валидации
 }
-
